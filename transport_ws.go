@@ -62,7 +62,7 @@ func (w *websocketConn) RemoteAddr() net.Addr {
 	return w.conn.RemoteAddr()
 }
 
-func (w *websocketConn) NextReader() (int, PacketType, io.ReadCloser, error) {
+func (w *websocketConn) NextReader() (MessageType, PacketType, io.ReadCloser, error) {
 	msgType, reader, err := w.conn.NextReader()
 	if err != nil {
 		return 0, 0, nil, err
@@ -76,19 +76,32 @@ func (w *websocketConn) NextReader() (int, PacketType, io.ReadCloser, error) {
 	switch msgType {
 	case websocket.TextMessage:
 		b[0] -= '0'
+		return MessageTypeString, PacketType(b[0]), ioutil.NopCloser(reader), nil
+	case websocket.BinaryMessage:
+		return MessageTypeBinary, PacketType(b[0]), ioutil.NopCloser(reader), nil
 	}
 
-	return msgType, PacketType(b[0]), ioutil.NopCloser(reader), nil
+	return 0, 0, nil, ErrInvalidMessage
 }
 
-func (w *websocketConn) NextWriter(msgType int, pt PacketType) (io.WriteCloser, error) {
-	wc, err := w.conn.NextWriter(msgType)
+func (w *websocketConn) NextWriter(msgType MessageType, pt PacketType) (io.WriteCloser, error) {
+	var m int
+	switch msgType {
+	case MessageTypeString:
+		m = websocket.TextMessage
+	case MessageTypeBinary:
+		m = websocket.BinaryMessage
+	default:
+		return nil, ErrInvalidMessage
+	}
+
+	wc, err := w.conn.NextWriter(m)
 	if err != nil {
 		return nil, err
 	}
 	b := []byte{byte(pt)}
 	switch msgType {
-	case websocket.TextMessage:
+	case MessageTypeString:
 		b[0] += '0'
 	}
 	if _, err := wc.Write(b); err != nil {

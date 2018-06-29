@@ -11,7 +11,11 @@ type Transport interface {
 }
 
 type Conn interface {
-	NextReader() (int, PacketType, io.ReadCloser, error)
-	NextWriter(int, PacketType) (io.WriteCloser, error)
+	NextReader() (MessageType, PacketType, io.ReadCloser, error)
+	NextWriter(MessageType, PacketType) (io.WriteCloser, error)
 	Close() error
+}
+
+type Socket struct {
+	Conn
 }

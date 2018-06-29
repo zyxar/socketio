@@ -43,3 +43,10 @@ type Parameters struct {
 	PingInterval int      `json:"pingInterval"`
 	PingTimeout  int      `json:"pingTimeout"`
 }
+
+type MessageType byte
+
+const (
+	MessageTypeString MessageType = iota
+	MessageTypeBinary
+)
