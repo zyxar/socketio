@@ -15,6 +15,7 @@ var (
 
 type Client struct {
 	*Socket
+	*eventHandlers
 	id           string
 	pingInterval time.Duration
 	pingTimeout  time.Duration
@@ -43,6 +44,16 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
 	closeChan := make(chan struct{}, 1)
+	eventHandlers := newEventHandlers()
+	so := &Socket{conn}
+	c = &Client{
+		Socket:        so,
+		eventHandlers: eventHandlers,
+		pingInterval:  pingInterval,
+		pingTimeout:   pingTimeout,
+		closeChan:     closeChan,
+		id:            param.SID,
+	}
 
 	go func() {
 		for {
@@ -51,24 +62,45 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 				return
 			case <-time.After(pingInterval):
 			}
-			wc, err := conn.NextWriter(MessageTypeString, PacketTypePing)
-			if err != nil {
+			if err = c.Ping(); err != nil {
+				println(err.Error())
 				return
 			}
-			if err = wc.Close(); err != nil {
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				return
+			default:
+			}
+			if err := eventHandlers.handle(so); err != nil {
+				println(err.Error())
 				return
 			}
 		}
 	}()
 
-	c = &Client{
-		Socket:       &Socket{conn},
-		pingInterval: pingInterval,
-		pingTimeout:  pingTimeout,
-		closeChan:    closeChan,
-		id:           param.SID,
-	}
 	return
+}
+
+func send(conn Conn, msgType MessageType, pktType PacketType, data []byte) (err error) {
+	wc, err := conn.NextWriter(msgType, pktType)
+	if err != nil {
+		return
+	}
+	if len(data) > 0 {
+		if _, err = wc.Write(data); err != nil {
+			wc.Close()
+			return
+		}
+	}
+	return wc.Close()
+}
+
+func (c *Client) Ping() error {
+	return send(c.Conn, MessageTypeString, PacketTypePing, nil)
 }
 
 func (c *Client) Close() (err error) {
@@ -77,10 +109,6 @@ func (c *Client) Close() (err error) {
 		err = c.Conn.Close()
 	})
 	return
-}
-
-func (c *Client) On(event string, callback interface{}) {
-
 }
 
 func (c *Client) Id() string {
