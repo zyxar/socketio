@@ -1,6 +1,7 @@
 package engineio
 
 import (
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -47,8 +48,6 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 
 type websocketConn struct {
 	conn           *websocket.Conn
-	PingInterval   time.Duration
-	PingTimeout    time.Duration
 	ReceiveTimeout time.Duration
 	SendTimeout    time.Duration
 }
@@ -63,41 +62,40 @@ func (w *websocketConn) RemoteAddr() net.Addr {
 	return w.conn.RemoteAddr()
 }
 
-func (w *websocketConn) ReadMessage() (message []byte, err error) {
-	w.conn.SetReadDeadline(time.Now().Add(w.ReceiveTimeout))
+func (w *websocketConn) NextReader() (int, PacketType, io.ReadCloser, error) {
 	msgType, reader, err := w.conn.NextReader()
 	if err != nil {
-		return
+		return 0, 0, nil, err
 	}
 
-	//support only text messages exchange
-	if msgType != websocket.TextMessage {
-		// return "", ErrorBinaryMessage
-	}
-	message, err = ioutil.ReadAll(reader)
-	if err != nil {
-		return
+	b := []byte{0}
+	if _, err = io.ReadFull(reader, b); err != nil {
+		return 0, 0, nil, err
 	}
 
-	//empty messages are not allowed
-	// if len(text) == 0 {
-	// 	return "", ErrorPacketWrong
-	// }
+	switch msgType {
+	case websocket.TextMessage:
+		b[0] -= '0'
+	}
 
-	return
+	return msgType, PacketType(b[0]), ioutil.NopCloser(reader), nil
 }
 
-func (w *websocketConn) WriteMessage(message []byte) error {
-	w.conn.SetWriteDeadline(time.Now().Add(w.SendTimeout))
-	wc, err := w.conn.NextWriter(websocket.TextMessage)
+func (w *websocketConn) NextWriter(msgType int, pt PacketType) (io.WriteCloser, error) {
+	wc, err := w.conn.NextWriter(msgType)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if _, err = wc.Write(message); err != nil {
-		return err
+	b := []byte{byte(pt)}
+	switch msgType {
+	case websocket.TextMessage:
+		b[0] += '0'
 	}
-	return wc.Close()
+	if _, err := wc.Write(b); err != nil {
+		wc.Close()
+		return nil, err
+	}
+	return wc, nil
 }
 
 func (w *websocketConn) Close() error {

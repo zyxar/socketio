@@ -1,6 +1,7 @@
 package engineio
 
 import (
+	"io"
 	"net/http"
 )
 
@@ -10,7 +11,7 @@ type Transport interface {
 }
 
 type Conn interface {
-	ReadMessage() (message []byte, err error)
-	WriteMessage(message []byte) error
+	NextReader() (int, PacketType, io.ReadCloser, error)
+	NextWriter(int, PacketType) (io.WriteCloser, error)
 	Close() error
 }
