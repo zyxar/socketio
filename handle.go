@@ -6,16 +6,13 @@ import (
 )
 
 const (
-	EventOpen         = "open"         // Fired upon successful connection.
-	EventMessage      = "message"      // Fired when data is received from the server.
-	EventClose        = "close"        // Fired upon disconnection. In compliance with the WebSocket API spec, this event may be fired even if the open event does not occur (i.e. due to connection error or close()).
-	EventError        = "error"        // Fired when an error occurs.
-	EventFlush        = "flush"        // Fired upon completing a buffer flush
-	EventDrain        = "drain"        // Fired after drain event of transport if writeBuffer is empty
-	EventUpgradeError = "upgradeError" // Fired if an error occurs with a transport we're trying to upgrade to.
-	EventUpgrade      = "upgrade"      // Fired upon upgrade success, after the new transport is set
-	EventPing         = "ping"         // Fired upon flushing a ping packet (ie: actual packet write out)
-	EventPong         = "pong"         // Fired upon receiving a pong packet.
+	EventOpen    = "open"    // Fired upon successful connection.
+	EventMessage = "message" // Fired when data is received from the server.
+	EventClose   = "close"   // Fired upon disconnection. In compliance with the WebSocket API spec, this event may be fired even if the open event does not occur (i.e. due to connection error or close()).
+	EventError   = "error"   // Fired when an error occurs.
+	EventUpgrade = "upgrade" // Fired upon upgrade success, after the new transport is set
+	EventPing    = "ping"    // Fired upon flushing a ping packet (ie: actual packet write out)
+	EventPong    = "pong"    // Fired upon receiving a pong packet.
 
 )
 

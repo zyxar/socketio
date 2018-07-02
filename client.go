@@ -11,6 +11,7 @@ import (
 var (
 	ErrInvalidMessage   = errors.New("invalid message")
 	ErrUnexpectedPacket = errors.New("unexpected packet")
+	ErrInvalidEvent     = errors.New("invalid event")
 )
 
 type Client struct {
@@ -85,22 +86,8 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 	return
 }
 
-func send(conn Conn, msgType MessageType, pktType PacketType, data []byte) (err error) {
-	wc, err := conn.NextWriter(msgType, pktType)
-	if err != nil {
-		return
-	}
-	if len(data) > 0 {
-		if _, err = wc.Write(data); err != nil {
-			wc.Close()
-			return
-		}
-	}
-	return wc.Close()
-}
-
 func (c *Client) Ping() error {
-	return send(c.Conn, MessageTypeString, PacketTypePing, nil)
+	return c.Emit(EventPing, nil)
 }
 
 func (c *Client) Close() (err error) {
