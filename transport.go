@@ -19,6 +19,11 @@ type Conn interface {
 
 type Socket struct {
 	Conn
+	*eventHandlers
+}
+
+func (s *Socket) Handle() error {
+	return s.eventHandlers.handle(s)
 }
 
 func (s *Socket) Emit(event string, args interface{}) (err error) {

@@ -13,7 +13,6 @@ const (
 	EventUpgrade = "upgrade" // Fired upon upgrade success, after the new transport is set
 	EventPing    = "ping"    // Fired upon flushing a ping packet (ie: actual packet write out)
 	EventPong    = "pong"    // Fired upon receiving a pong packet.
-
 )
 
 type Handle func(so *Socket, data []byte)

@@ -16,7 +16,6 @@ var (
 
 type Client struct {
 	*Socket
-	*eventHandlers
 	id           string
 	pingInterval time.Duration
 	pingTimeout  time.Duration
@@ -45,15 +44,13 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
 	closeChan := make(chan struct{}, 1)
-	eventHandlers := newEventHandlers()
-	so := &Socket{conn}
+	so := &Socket{conn, newEventHandlers()}
 	c = &Client{
-		Socket:        so,
-		eventHandlers: eventHandlers,
-		pingInterval:  pingInterval,
-		pingTimeout:   pingTimeout,
-		closeChan:     closeChan,
-		id:            param.SID,
+		Socket:       so,
+		pingInterval: pingInterval,
+		pingTimeout:  pingTimeout,
+		closeChan:    closeChan,
+		id:           param.SID,
 	}
 
 	go func() {
@@ -76,7 +73,7 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 				return
 			default:
 			}
-			if err := eventHandlers.handle(so); err != nil {
+			if err := so.Handle(); err != nil {
 				println(err.Error())
 				return
 			}
