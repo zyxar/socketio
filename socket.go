@@ -26,6 +26,11 @@ func (s *Socket) Emit(event string, args interface{}) (err error) {
 	// case EventUpgrade:
 	case EventPing:
 		pktType = PacketTypePing
+		defer func() {
+			if err == nil {
+				s.fire(s, EventPing, MessageTypeString, nil)
+			}
+		}()
 	case EventPong:
 		pktType = PacketTypePong
 	default:

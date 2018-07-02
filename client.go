@@ -67,6 +67,7 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 		}
 	}()
 	go func() {
+		defer so.Close()
 		for {
 			select {
 			case <-closeChan:

@@ -35,11 +35,15 @@ func NewServer() (*Server, error) {
 				if !ok {
 					return
 				}
-				s.fire(ß.Socket, EventOpen, nil)
+				s.fire(ß.Socket, EventOpen, MessageTypeString, nil)
 				go func() {
+					so := ß.Socket
+					defer so.Close()
+					defer s.sessionManager.Remove(ß.id)
 					for {
-						if err := ß.Socket.Handle(); err != nil {
+						if err := so.Handle(); err != nil {
 							println(err.Error())
+							so.fire(so, EventClose, MessageTypeString, nil)
 							return
 						}
 					}
