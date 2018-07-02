@@ -50,3 +50,14 @@ const (
 	MessageTypeString MessageType = iota
 	MessageTypeBinary
 )
+
+const (
+	queryTransport = "transport"
+	queryJSONP     = "j"
+	querySession   = "sid"
+	queryBase64    = "b64"
+	queryEIO       = "EIO"
+
+	defaultPathname = "/engine.io/"
+	Version         = "3"
+)

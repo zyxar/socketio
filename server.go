@@ -64,16 +64,16 @@ func (s *Server) Close() (err error) {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	println(query.Encode())
-	transport := query.Get("transport")
-	sid := query.Get("sid")
+	transport := getTransport(query.Get(queryTransport))
+	sid := query.Get(querySession)
 
-	if transport != "websocket" {
+	if transport == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return
 	}
 	var ß *session
 	if sid == "" {
-		conn, err := s.transport.Accept(w, r)
+		conn, err := transport.Accept(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return

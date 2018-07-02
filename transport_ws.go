@@ -34,8 +34,8 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 		return nil, err
 	}
 	q := u.Query()
-	q.Set("EIO", "3")
-	q.Set("transport", "websocket")
+	q.Set(queryEIO, Version)
+	q.Set(queryTransport, "websocket")
 	u.RawQuery = q.Encode()
 	dialer := &websocket.Dialer{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize}
 	c, _, err := dialer.Dial(u.String(), requestHeader)

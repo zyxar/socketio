@@ -15,3 +15,12 @@ type Conn interface {
 	NextWriter(MessageType, PacketType) (io.WriteCloser, error)
 	Close() error
 }
+
+func getTransport(tr string) Transport {
+	switch tr {
+	case "websocket":
+		return WebsocketTransport
+	case "polling":
+	}
+	return nil
+}
