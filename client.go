@@ -1,4 +1,4 @@
-package engineio
+package engio
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package engineio
+package engio
 
 type PacketType byte
 
