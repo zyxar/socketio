@@ -13,10 +13,6 @@ const (
 	_PacketTypeMax
 )
 
-type Packet struct {
-	PacketType
-}
-
 func (p PacketType) String() string {
 	switch p {
 	case PacketTypeOpen:
@@ -50,6 +46,16 @@ const (
 	MessageTypeString MessageType = iota
 	MessageTypeBinary
 )
+
+func (m MessageType) String() string {
+	switch m {
+	case MessageTypeString:
+		return "string"
+	case MessageTypeBinary:
+		return "binary"
+	}
+	return "invalid"
+}
 
 const (
 	queryTransport = "transport"
