@@ -23,8 +23,8 @@ type Client struct {
 	once         sync.Once
 }
 
-func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, err error) {
-	conn, err := tr.Dial(rawurl, requestHeader)
+func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, err error) {
+	conn, err := dialer.Dial(rawurl, requestHeader)
 	if err != nil {
 		return
 	}

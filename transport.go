@@ -6,7 +6,15 @@ import (
 )
 
 type Transport interface {
+	Dialer
+	Acceptor
+}
+
+type Dialer interface {
 	Dial(rawurl string, requestHeader http.Header) (conn Conn, err error)
+}
+
+type Acceptor interface {
 	Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error)
 }
 
@@ -16,8 +24,26 @@ type Conn interface {
 	io.Closer
 }
 
-func getTransport(tr string) Transport {
-	switch tr {
+func getTransport(name string) Transport {
+	switch name {
+	case "websocket":
+		return WebsocketTransport
+	case "polling":
+	}
+	return nil
+}
+
+func getAcceptor(name string) Acceptor {
+	switch name {
+	case "websocket":
+		return WebsocketTransport
+	case "polling":
+	}
+	return nil
+}
+
+func getDialer(name string) Dialer {
+	switch name {
 	case "websocket":
 		return WebsocketTransport
 	case "polling":

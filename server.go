@@ -10,7 +10,6 @@ import (
 )
 
 type Server struct {
-	transport    Transport
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	ßchan        chan *session
@@ -21,7 +20,6 @@ type Server struct {
 
 func NewServer() (*Server, error) {
 	s := &Server{
-		transport:      WebsocketTransport,
 		pingInterval:   time.Second * 25,
 		pingTimeout:    time.Second * 5,
 		ßchan:          make(chan *session, 1),
@@ -64,16 +62,16 @@ func (s *Server) Close() (err error) {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	println(query.Encode())
-	transport := getTransport(query.Get(queryTransport))
+	acceptor := getAcceptor(query.Get(queryTransport))
 	sid := query.Get(querySession)
 
-	if transport == nil {
+	if acceptor == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return
 	}
 	var ß *session
 	if sid == "" {
-		conn, err := transport.Accept(w, r)
+		conn, err := acceptor.Accept(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
