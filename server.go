@@ -107,6 +107,12 @@ type session struct {
 	id string
 }
 
+func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if handler, ok := s.Socket.Conn.(http.Handler); ok {
+		handler.ServeHTTP(w, r)
+	}
+}
+
 func newSession(conn Conn) *session {
 	id := generateRandomKey(24)
 	return &session{
