@@ -18,10 +18,10 @@ type Server struct {
 	*eventHandlers
 }
 
-func NewServer() (*Server, error) {
+func NewServer(interval, timeout time.Duration) (*Server, error) {
 	s := &Server{
-		pingInterval:   time.Second * 25,
-		pingTimeout:    time.Second * 5,
+		pingInterval:   interval,
+		pingTimeout:    timeout,
 		ßchan:          make(chan *session, 1),
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
@@ -61,15 +61,16 @@ func (s *Server) Close() (err error) {
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	println(query.Encode())
+	println(r.Method, r.URL.RawQuery)
 	acceptor := getAcceptor(query.Get(queryTransport))
-	sid := query.Get(querySession)
 
 	if acceptor == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return
 	}
+
 	var ß *session
+	sid := query.Get(querySession)
 	if sid == "" {
 		conn, err := acceptor.Accept(w, r)
 		if err != nil {

@@ -47,9 +47,9 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 }
 
 type websocketConn struct {
-	conn           *websocket.Conn
-	ReceiveTimeout time.Duration
-	SendTimeout    time.Duration
+	conn         *websocket.Conn
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
 // LocalAddr returns the local network address.

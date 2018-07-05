@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var (
@@ -15,11 +16,13 @@ var (
 )
 
 type pollingConn struct {
-	in     chan *Packet
-	out    chan *Packet
-	closed chan struct{}
-	once   sync.Once
-	wg     sync.WaitGroup
+	in           chan *Packet
+	out          chan *Packet
+	closed       chan struct{}
+	once         sync.Once
+	wg           sync.WaitGroup
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
 func (p *pollingConn) close() {
@@ -87,7 +90,13 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		if _, err := pkt.WriteTo(w); err != nil {
+		q := r.URL.Query()
+		if jsonp := q.Get(queryJSONP); jsonp != "" {
+			err = writeJSONP(w, jsonp, pkt)
+		} else {
+			err = writeXHR(w, pkt)
+		}
+		if err != nil {
 			println(err.Error())
 		}
 	case "POST":
@@ -108,10 +117,10 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var _ Conn = NewPollingConn(1)
 
-func writeJSONP(w http.ResponseWriter, jsonp string, rd io.Reader) error {
+func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	var buf bytes.Buffer
 	w.Header().Set("Content-Type", "text/javascript; charset=UTF-8")
-	if _, err := buf.ReadFrom(rd); err != nil {
+	if _, err := wt.WriteTo(&buf); err != nil {
 		return err
 	}
 	tmpl := template.JSEscapeString(buf.String())
@@ -119,9 +128,9 @@ func writeJSONP(w http.ResponseWriter, jsonp string, rd io.Reader) error {
 	return err
 }
 
-func writeXHR(w http.ResponseWriter, rd io.Reader) error {
+func writeXHR(w http.ResponseWriter, wt io.WriterTo) error {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
-	if _, err := io.Copy(w, rd); err != nil {
+	if _, err := wt.WriteTo(w); err != nil {
 		return err
 	}
 	return nil

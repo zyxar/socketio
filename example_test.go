@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func ExampleDial() {
@@ -20,7 +21,7 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := NewServer()
+	server, _ := NewServer(time.Second*5, time.Second*5)
 	server.On(EventOpen, Callback(func(so *Socket, _ MessageType, _ []byte) {
 		so.On(EventMessage, Callback(func(_ *Socket, typ MessageType, data []byte) {
 			switch typ {
