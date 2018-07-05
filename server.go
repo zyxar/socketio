@@ -77,7 +77,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		ß = s.NewSession(conn)
+		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.Emit(EventOpen, &Parameters{
 			SID:          ß.id,
 			Upgrades:     []string{},
@@ -90,6 +90,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ß, exists = s.sessionManager.Get(sid)
 		if !exists {
 			http.Error(w, "invalid session", http.StatusBadRequest)
+			return
 		}
 	}
 	ß.ServeHTTP(w, r)
@@ -115,11 +116,15 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func newSession(conn Conn) *session {
+func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
 	id := generateRandomKey(24)
 	return &session{
-		Socket: &Socket{Conn: conn, eventHandlers: newEventHandlers()},
-		id:     base64.StdEncoding.EncodeToString(id),
+		Socket: &Socket{
+			Conn:          conn,
+			eventHandlers: newEventHandlers(),
+			readTimeout:   readTimeout,
+			writeTimeout:  writeTimeout},
+		id: base64.StdEncoding.EncodeToString(id),
 	}
 }
 
@@ -147,8 +152,8 @@ func (s *sessionManager) Remove(id string) {
 	s.Unlock()
 }
 
-func (s *sessionManager) NewSession(conn Conn) *session {
-	ß := newSession(conn)
+func (s *sessionManager) NewSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
+	ß := newSession(conn, readTimeout, writeTimeout)
 	s.Lock()
 	s.ß[ß.id] = ß
 	s.Unlock()

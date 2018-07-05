@@ -44,7 +44,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
 	closeChan := make(chan struct{}, 1)
-	so := &Socket{conn, newEventHandlers()}
+	so := &Socket{conn, newEventHandlers(), pingTimeout, pingTimeout}
 	c = &Client{
 		Socket:       so,
 		pingInterval: pingInterval,

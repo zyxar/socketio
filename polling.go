@@ -8,21 +8,24 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 var (
-	ErrPollingConnClosed = errors.New("polling connection closed")
+	ErrPollingConnClosed       = errors.New("polling connection closed")
+	ErrPollingConnReadTimeout  = errors.New("polling connection read timeout")
+	ErrPollingConnWriteTimeout = errors.New("polling connection write timeout")
 )
 
 type pollingConn struct {
-	in           chan *Packet
-	out          chan *Packet
-	closed       chan struct{}
-	once         sync.Once
-	wg           sync.WaitGroup
-	readTimeout  time.Duration
-	writeTimeout time.Duration
+	in            chan *Packet
+	out           chan *Packet
+	closed        chan struct{}
+	once          sync.Once
+	wg            sync.WaitGroup
+	readDeadline  atomic.Value
+	writeDeadline atomic.Value
 }
 
 func (p *pollingConn) close() {
@@ -49,6 +52,15 @@ func NewPollingConn(bufSize int) *pollingConn {
 }
 
 func (p *pollingConn) ReadPacket() (*Packet, error) {
+	var timer <-chan time.Time
+	t := p.readDeadline.Load()
+	if t != nil {
+		deadline := t.(time.Time)
+		timeout := deadline.Sub(time.Now())
+		if timeout > 0 {
+			timer = time.After(timeout)
+		}
+	}
 	select {
 	case <-p.closed:
 		return nil, ErrPollingConnClosed
@@ -57,6 +69,8 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 			return nil, ErrPollingConnClosed
 		}
 		return pkt, nil
+	case <-timer:
+		return nil, ErrPollingConnReadTimeout
 	}
 }
 
@@ -73,11 +87,32 @@ func (p *pollingConn) ReadPacketOut() (*Packet, error) {
 }
 
 func (p *pollingConn) WritePacket(pkt *Packet) error {
+	var timer <-chan time.Time
+	t := p.writeDeadline.Load()
+	if t != nil {
+		deadline := t.(time.Time)
+		timeout := deadline.Sub(time.Now())
+		if timeout > 0 {
+			timer = time.After(timeout)
+		}
+	}
 	select {
 	case <-p.closed:
 		return ErrPollingConnClosed
 	case p.out <- pkt:
+	case <-timer:
+		return ErrPollingConnWriteTimeout
 	}
+	return nil
+}
+
+func (p *pollingConn) SetReadDeadline(t time.Time) error {
+	p.readDeadline.Store(t)
+	return nil
+}
+
+func (p *pollingConn) SetWriteDeadline(t time.Time) error {
+	p.writeDeadline.Store(t)
 	return nil
 }
 
@@ -107,7 +142,12 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for i := range payload.packets {
-			p.in <- &payload.packets[i]
+			select {
+			case <-p.closed:
+				http.Error(w, "closed", http.StatusGone)
+				return
+			case p.in <- &payload.packets[i]:
+			}
 		}
 		http.Error(w, "OK", http.StatusOK)
 	default:

@@ -2,11 +2,14 @@ package engio
 
 import (
 	"encoding/json"
+	"time"
 )
 
 type Socket struct {
 	Conn
 	*eventHandlers
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
 func (s *Socket) Handle() error {
@@ -41,6 +44,7 @@ func (s *Socket) Emit(event string, args interface{}) (err error) {
 	if err != nil {
 		return
 	}
+	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
 	err = s.Conn.WritePacket(&Packet{MessageTypeString, pktType, data})
 	return
 }

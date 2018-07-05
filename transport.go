@@ -3,6 +3,7 @@ package engio
 import (
 	"io"
 	"net/http"
+	"time"
 )
 
 type Transport interface {
@@ -22,6 +23,8 @@ type Conn interface {
 	PacketReader
 	PacketWriter
 	io.Closer
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
 }
 
 func getTransport(name string) Transport {

@@ -2,6 +2,7 @@ package engio
 
 import (
 	"sync"
+	"time"
 )
 
 const (
@@ -51,6 +52,7 @@ func (e *eventHandlers) fire(so *Socket, event string, typ MessageType, data []b
 }
 
 func (e *eventHandlers) handle(so *Socket) error {
+	so.SetReadDeadline(time.Now().Add(so.readTimeout))
 	p, err := so.ReadPacket()
 	if err != nil {
 		return err
