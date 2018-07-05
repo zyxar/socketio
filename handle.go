@@ -1,7 +1,6 @@
 package engio
 
 import (
-	"bytes"
 	"sync"
 )
 
@@ -52,28 +51,23 @@ func (e *eventHandlers) fire(so *Socket, event string, typ MessageType, data []b
 }
 
 func (e *eventHandlers) handle(so *Socket) error {
-	typ, packetType, rc, err := so.NextReader()
+	p, err := so.ReadPacket()
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
-	var buffer bytes.Buffer
-	if _, err := buffer.ReadFrom(rc); err != nil {
-		return err
-	}
-	switch packetType {
+	switch p.pktType {
 	case PacketTypeOpen:
 	case PacketTypeClose:
-		e.fire(so, EventClose, typ, buffer.Bytes())
+		e.fire(so, EventClose, p.msgType, p.data)
 		return so.Close()
 	case PacketTypePing:
-		so.Emit(EventPong, buffer.Bytes())
+		so.Emit(EventPong, p.data)
 	case PacketTypePong:
-		e.fire(so, EventPong, typ, buffer.Bytes())
+		e.fire(so, EventPong, p.msgType, p.data)
 	case PacketTypeMessage:
-		e.fire(so, EventMessage, typ, buffer.Bytes())
+		e.fire(so, EventMessage, p.msgType, p.data)
 	case PacketTypeUpgrade:
-		e.fire(so, EventUpgrade, typ, buffer.Bytes())
+		e.fire(so, EventUpgrade, p.msgType, p.data)
 	case PacketTypeNoop:
 		// noop
 	default:

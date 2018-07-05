@@ -41,24 +41,10 @@ func (s *Socket) Emit(event string, args interface{}) (err error) {
 	if err != nil {
 		return
 	}
-	err = send(s.Conn, MessageTypeString, pktType, data)
+	err = s.Conn.WritePacket(&Packet{MessageTypeString, pktType, data})
 	return
 }
 
 func (s *Socket) Send(args interface{}) (err error) {
 	return s.Emit(EventMessage, args)
-}
-
-func send(conn Conn, msgType MessageType, pktType PacketType, data []byte) (err error) {
-	wc, err := conn.NextWriter(msgType, pktType)
-	if err != nil {
-		return
-	}
-	if len(data) > 0 {
-		if _, err = wc.Write(data); err != nil {
-			wc.Close()
-			return
-		}
-	}
-	return wc.Close()
 }

@@ -1,8 +1,8 @@
 package engio
 
 import (
+	"bytes"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -62,29 +62,7 @@ func (w *websocketConn) RemoteAddr() net.Addr {
 	return w.conn.RemoteAddr()
 }
 
-func (w *websocketConn) NextReader() (MessageType, PacketType, io.ReadCloser, error) {
-	msgType, reader, err := w.conn.NextReader()
-	if err != nil {
-		return 0, 0, nil, err
-	}
-
-	b := []byte{0}
-	if _, err = io.ReadFull(reader, b); err != nil {
-		return 0, 0, nil, err
-	}
-
-	switch msgType {
-	case websocket.TextMessage:
-		b[0] -= '0'
-		return MessageTypeString, PacketType(b[0]), ioutil.NopCloser(reader), nil
-	case websocket.BinaryMessage:
-		return MessageTypeBinary, PacketType(b[0]), ioutil.NopCloser(reader), nil
-	}
-
-	return 0, 0, nil, ErrInvalidMessage
-}
-
-func (w *websocketConn) NextWriter(msgType MessageType, pt PacketType) (io.WriteCloser, error) {
+func (w *websocketConn) nextWriter(msgType MessageType, pt PacketType) (io.WriteCloser, error) {
 	var m int
 	switch msgType {
 	case MessageTypeString:
@@ -113,4 +91,46 @@ func (w *websocketConn) NextWriter(msgType MessageType, pt PacketType) (io.Write
 
 func (w *websocketConn) Close() error {
 	return w.conn.Close()
+}
+
+func (w *websocketConn) WritePacket(p *Packet) error {
+	wc, err := w.nextWriter(p.msgType, p.pktType)
+	if err != nil {
+		return err
+	}
+	if len(p.data) > 0 {
+		if _, err = wc.Write(p.data); err != nil {
+			wc.Close()
+			return err
+		}
+	}
+	return wc.Close()
+}
+
+func (w *websocketConn) ReadPacket() (p *Packet, err error) {
+	msgType, reader, err := w.conn.NextReader()
+	if err != nil {
+		return nil, err
+	}
+
+	b := []byte{0}
+	if _, err = io.ReadFull(reader, b); err != nil {
+		return nil, err
+	}
+	switch msgType {
+	case websocket.TextMessage:
+		b[0] -= '0'
+		p = &Packet{MessageTypeString, PacketType(b[0]), nil}
+	case websocket.BinaryMessage:
+		p = &Packet{MessageTypeBinary, PacketType(b[0]), nil}
+	default:
+		return nil, ErrInvalidMessage
+	}
+
+	var buffer bytes.Buffer
+	if _, err = buffer.ReadFrom(reader); err != nil {
+		return
+	}
+	p.data = buffer.Bytes()
+	return
 }

@@ -28,16 +28,16 @@ func Dial(rawurl string, requestHeader http.Header, tr Transport) (c *Client, er
 	if err != nil {
 		return
 	}
-	_, pt, rc, err := conn.NextReader()
+	p, err := conn.ReadPacket()
 	if err != nil {
 		return
 	}
-	if pt != PacketTypeOpen {
+	if p.pktType != PacketTypeOpen {
 		err = ErrUnexpectedPacket
 		return
 	}
 	var param Parameters
-	if err = json.NewDecoder(rc).Decode(&param); err != nil {
+	if err = json.Unmarshal(p.data, &param); err != nil {
 		return
 	}
 	pingInterval := time.Duration(param.PingInterval) * time.Millisecond

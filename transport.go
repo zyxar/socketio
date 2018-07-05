@@ -11,9 +11,9 @@ type Transport interface {
 }
 
 type Conn interface {
-	NextReader() (MessageType, PacketType, io.ReadCloser, error)
-	NextWriter(MessageType, PacketType) (io.WriteCloser, error)
-	Close() error
+	PacketReader
+	PacketWriter
+	io.Closer
 }
 
 func getTransport(tr string) Transport {
@@ -23,4 +23,12 @@ func getTransport(tr string) Transport {
 	case "polling":
 	}
 	return nil
+}
+
+type PacketReader interface {
+	ReadPacket() (p *Packet, err error)
+}
+
+type PacketWriter interface {
+	WritePacket(p *Packet) error
 }

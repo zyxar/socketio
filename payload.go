@@ -12,7 +12,7 @@ var (
 	errInvalidPayload = errors.New("invalid payload")
 )
 
-type PayloadReader interface {
+type ByterReader interface {
 	io.Reader
 	io.ByteReader
 }
@@ -22,13 +22,13 @@ type Payload struct {
 }
 
 func (p *Payload) ReadFrom(r io.Reader) (n int64, err error) {
-	if rd, ok := r.(PayloadReader); ok {
+	if rd, ok := r.(ByterReader); ok {
 		return p.readFrom(rd)
 	}
 	return p.readFrom(bufio.NewReader(r))
 }
 
-func (p *Payload) readFrom(r PayloadReader) (n int64, err error) {
+func (p *Payload) readFrom(r ByterReader) (n int64, err error) {
 	for {
 		var pkt Packet
 		nn, err := pkt.Decode(r)
@@ -116,7 +116,7 @@ func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-func (p *Packet) Decode(pr PayloadReader) (int, error) {
+func (p *Packet) Decode(pr ByterReader) (int, error) {
 	n, l, err := p.decode(pr)
 	if err != nil {
 		return n, err
