@@ -16,7 +16,7 @@ func (s *Socket) Handle() error {
 	return s.eventHandlers.handle(s)
 }
 
-func (s *Socket) Emit(event string, args interface{}) (err error) {
+func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err error) {
 	var pktType PacketType
 	switch event {
 	case EventOpen:
@@ -31,7 +31,7 @@ func (s *Socket) Emit(event string, args interface{}) (err error) {
 		pktType = PacketTypePing
 		defer func() {
 			if err == nil {
-				s.fire(s, EventPing, MessageTypeString, nil)
+				s.fire(s, EventPing, msgType, nil)
 			}
 		}()
 	case EventPong:
@@ -45,8 +45,12 @@ func (s *Socket) Emit(event string, args interface{}) (err error) {
 		return
 	}
 	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-	err = s.Conn.WritePacket(&Packet{MessageTypeString, pktType, data})
+	err = s.Conn.WritePacket(&Packet{msgType, pktType, data})
 	return
+}
+
+func (s *Socket) Emit(event event, args interface{}) (err error) {
+	return s.emit(event, MessageTypeString, args)
 }
 
 func (s *Socket) Send(args interface{}) (err error) {
