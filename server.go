@@ -91,6 +91,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid session", http.StatusBadRequest)
 		}
 	}
+	ß.ServeHTTP(w, r)
 	return
 }
 

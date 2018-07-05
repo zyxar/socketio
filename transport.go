@@ -38,6 +38,7 @@ func getAcceptor(name string) Acceptor {
 	case "websocket":
 		return WebsocketTransport
 	case "polling":
+		return PollingAcceptor
 	}
 	return nil
 }
