@@ -144,3 +144,6 @@ func (w *websocketConn) SetReadDeadline(t time.Time) error {
 func (w *websocketConn) SetWriteDeadline(t time.Time) error {
 	return w.conn.SetWriteDeadline(t)
 }
+
+func (*websocketConn) Pause() error  { return ErrPauseNotSupported }
+func (*websocketConn) Resume() error { return nil }

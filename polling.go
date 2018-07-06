@@ -16,6 +16,7 @@ var (
 	ErrPollingConnClosed       = errors.New("polling connection closed")
 	ErrPollingConnReadTimeout  = errors.New("polling connection read timeout")
 	ErrPollingConnWriteTimeout = errors.New("polling connection write timeout")
+	ErrPollingConnPaused       = errors.New("polling connection paused")
 )
 
 type pollingConn struct {
@@ -23,22 +24,15 @@ type pollingConn struct {
 	out           chan *Packet
 	closed        chan struct{}
 	once          sync.Once
-	wg            sync.WaitGroup
 	readDeadline  atomic.Value
 	writeDeadline atomic.Value
-}
-
-func (p *pollingConn) close() {
-	p.once.Do(func() {
-		close(p.closed)
-		close(p.in)
-		close(p.out)
-	})
+	paused        atomic.Value
 }
 
 func (p *pollingConn) Close() error {
-	p.close()
-	p.wg.Wait()
+	p.once.Do(func() {
+		close(p.closed)
+	})
 	return nil
 }
 
@@ -48,10 +42,14 @@ func NewPollingConn(bufSize int) *pollingConn {
 		out:    make(chan *Packet, bufSize),
 		closed: make(chan struct{}),
 	}
+	p.paused.Store(make(chan struct{}))
 	return p
 }
 
 func (p *pollingConn) ReadPacket() (*Packet, error) {
+	if p.isClosed() {
+		return nil, ErrPollingConnClosed
+	}
 	var timer <-chan time.Time
 	t := p.readDeadline.Load()
 	if t != nil {
@@ -69,12 +67,17 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 			return nil, ErrPollingConnClosed
 		}
 		return pkt, nil
+	case <-p.pauseChan():
+		return nil, ErrPollingConnPaused
 	case <-timer:
 		return nil, ErrPollingConnReadTimeout
 	}
 }
 
 func (p *pollingConn) ReadPacketOut() (*Packet, error) {
+	if p.isClosed() {
+		return nil, ErrPollingConnClosed
+	}
 	select {
 	case <-p.closed:
 		return nil, ErrPollingConnClosed
@@ -83,10 +86,15 @@ func (p *pollingConn) ReadPacketOut() (*Packet, error) {
 			return nil, ErrPollingConnClosed
 		}
 		return pkt, nil
+	case <-p.pauseChan():
+		return &Packet{msgType: MessageTypeString, pktType: PacketTypeNoop}, nil
 	}
 }
 
 func (p *pollingConn) WritePacket(pkt *Packet) error {
+	if p.isClosed() {
+		return ErrPollingConnClosed
+	}
 	var timer <-chan time.Time
 	t := p.writeDeadline.Load()
 	if t != nil {
@@ -102,6 +110,8 @@ func (p *pollingConn) WritePacket(pkt *Packet) error {
 	case p.out <- pkt:
 	case <-timer:
 		return ErrPollingConnWriteTimeout
+	case <-p.pauseChan():
+		return ErrPollingConnPaused
 	}
 	return nil
 }
@@ -146,6 +156,9 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case <-p.closed:
 				http.Error(w, "closed", http.StatusGone)
 				return
+			case <-p.pauseChan():
+				http.Error(w, "paused", http.StatusBadGateway)
+				return
 			case p.in <- &payload.packets[i]:
 			}
 		}
@@ -153,6 +166,28 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "error", http.StatusMethodNotAllowed)
 	}
+}
+
+func (p *pollingConn) isClosed() bool {
+	select {
+	case <-p.closed:
+		return true
+	default:
+	}
+	return false
+}
+
+func (p *pollingConn) pauseChan() <-chan struct{} {
+	return p.paused.Load().(chan struct{})
+}
+
+func (p *pollingConn) Pause() error {
+	close(p.paused.Load().(chan struct{}))
+	return nil
+}
+func (p *pollingConn) Resume() error {
+	p.paused.Store(make(chan struct{}))
+	return nil
 }
 
 var _ Conn = NewPollingConn(1)

@@ -1,6 +1,7 @@
 package engio
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -26,6 +27,8 @@ type Conn interface {
 	io.Closer
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
+	Pause() error
+	Resume() error
 }
 
 func getTransport(name string) Transport {
@@ -67,4 +70,8 @@ type PacketWriter interface {
 const (
 	transportWebsocket string = "websocket"
 	transportPolling   string = "polling"
+)
+
+var (
+	ErrPauseNotSupported = errors.New("transport pause unsupported")
 )

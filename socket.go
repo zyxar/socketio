@@ -32,18 +32,26 @@ func (s *Socket) Upgrade(acceptor Acceptor, newConn Conn) {
 		newConn.Close()
 		return
 	}
-	// s.RLock()
-	// conn := s.Conn
-	// s.RUnlock()
+
+	s.RLock()
+	conn := s.Conn
+	s.RUnlock()
+
+	if err := conn.Pause(); err != nil {
+		newConn.Close()
+		return
+	}
 
 	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
 	p, err = newConn.ReadPacket()
 	if err != nil {
 		newConn.Close()
+		conn.Resume()
 		return
 	}
 	if p.pktType != PacketTypeUpgrade {
 		newConn.Close()
+		conn.Resume()
 		return
 	}
 
