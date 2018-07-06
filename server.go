@@ -75,6 +75,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
+		ß.transport = acceptor.Transport()
 		ß.Emit(EventOpen, &Parameters{
 			SID:          ß.id,
 			Upgrades:     []string{},
@@ -88,6 +89,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !exists {
 			http.Error(w, "invalid session", http.StatusBadRequest)
 			return
+		}
+		if ß.transport != acceptor.Transport() {
+			conn, err := acceptor.Accept(w, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			ß.Upgrade(acceptor, conn)
 		}
 	}
 	ß.ServeHTTP(w, r)

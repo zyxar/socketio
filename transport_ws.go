@@ -18,6 +18,10 @@ type websocketTransport struct {
 	WriteBufferSize int
 }
 
+func (websocketTransport) Transport() string {
+	return transportWebsocket
+}
+
 func (t *websocketTransport) Accept(w http.ResponseWriter, r *http.Request) (Conn, error) {
 	upgrader := &websocket.Upgrader{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize}
 	c, err := upgrader.Upgrade(w, r, w.Header())

@@ -12,3 +12,7 @@ func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn C
 }
 
 var PollingAcceptor Acceptor = &pollingAcceptor{}
+
+func (pollingAcceptor) Transport() string {
+	return transportPolling
+}

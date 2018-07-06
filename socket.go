@@ -2,6 +2,7 @@ package engio
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,47 @@ type Socket struct {
 	*eventHandlers
 	readTimeout  time.Duration
 	writeTimeout time.Duration
+	transport    string
+	sync.RWMutex
+}
+
+func (s *Socket) Upgrade(acceptor Acceptor, newConn Conn) {
+	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
+	p, err := newConn.ReadPacket()
+	if err != nil {
+		newConn.Close()
+		return
+	}
+	if p.pktType != PacketTypePing {
+		newConn.Close()
+		return
+	}
+	p.pktType = PacketTypePong
+	newConn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+	if err = newConn.WritePacket(p); err != nil {
+		newConn.Close()
+		return
+	}
+	// s.RLock()
+	// conn := s.Conn
+	// s.RUnlock()
+
+	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
+	p, err = newConn.ReadPacket()
+	if err != nil {
+		newConn.Close()
+		return
+	}
+	if p.pktType != PacketTypeUpgrade {
+		newConn.Close()
+		return
+	}
+
+	s.Lock()
+	s.Conn = newConn
+	s.transport = acceptor.Transport()
+	s.Unlock()
+	return
 }
 
 func (s *Socket) Handle() error {

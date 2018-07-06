@@ -17,6 +17,7 @@ type Dialer interface {
 
 type Acceptor interface {
 	Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error)
+	Transport() string
 }
 
 type Conn interface {
@@ -29,18 +30,18 @@ type Conn interface {
 
 func getTransport(name string) Transport {
 	switch name {
-	case "websocket":
+	case transportWebsocket:
 		return WebsocketTransport
-	case "polling":
+	case transportPolling:
 	}
 	return nil
 }
 
 func getAcceptor(name string) Acceptor {
 	switch name {
-	case "websocket":
+	case transportWebsocket:
 		return WebsocketTransport
-	case "polling":
+	case transportPolling:
 		return PollingAcceptor
 	}
 	return nil
@@ -48,9 +49,9 @@ func getAcceptor(name string) Acceptor {
 
 func getDialer(name string) Dialer {
 	switch name {
-	case "websocket":
+	case transportWebsocket:
 		return WebsocketTransport
-	case "polling":
+	case transportPolling:
 	}
 	return nil
 }
@@ -62,3 +63,8 @@ type PacketReader interface {
 type PacketWriter interface {
 	WritePacket(p *Packet) error
 }
+
+const (
+	transportWebsocket string = "websocket"
+	transportPolling   string = "polling"
+)
