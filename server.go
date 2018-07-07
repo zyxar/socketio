@@ -37,6 +37,9 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 					defer s.sessionManager.Remove(ß.id)
 					for {
 						if err := so.Handle(); err != nil {
+							if err == ErrPollingConnPaused {
+								continue
+							}
 							println(err.Error())
 							so.fire(so, EventClose, MessageTypeString, nil)
 							return
@@ -71,14 +74,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if sid == "" {
 		conn, err := acceptor.Accept(w, r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.transport = acceptor.Transport()
 		ß.Emit(EventOpen, &Parameters{
 			SID:          ß.id,
-			Upgrades:     []string{},
+			Upgrades:     []string{"websocket"},
 			PingInterval: int(s.pingInterval / time.Millisecond),
 			PingTimeout:  int(s.pingTimeout / time.Millisecond),
 		})
@@ -93,7 +96,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if ß.transport != acceptor.Transport() {
 			conn, err := acceptor.Accept(w, r)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadGateway)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			ß.Upgrade(acceptor, conn)

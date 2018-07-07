@@ -156,9 +156,6 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case <-p.closed:
 				http.Error(w, "closed", http.StatusGone)
 				return
-			case <-p.pauseChan():
-				http.Error(w, "paused", http.StatusBadGateway)
-				return
 			case p.in <- &payload.packets[i]:
 			}
 		}

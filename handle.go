@@ -54,8 +54,10 @@ func (e *eventHandlers) fire(so *Socket, event event, typ MessageType, data []by
 }
 
 func (e *eventHandlers) handle(so *Socket) error {
+	so.RLock()
 	so.SetReadDeadline(time.Now().Add(so.readTimeout))
 	p, err := so.ReadPacket()
+	so.RUnlock()
 	if err != nil {
 		return err
 	}
