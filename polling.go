@@ -131,7 +131,7 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		pkt, err := p.ReadPacketOut()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusGone)
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -148,13 +148,13 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var payload Payload
 		_, err := payload.ReadFrom(r.Body)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		for i := range payload.packets {
 			select {
 			case <-p.closed:
-				http.Error(w, "closed", http.StatusGone)
+				http.Error(w, "closed", http.StatusNotFound)
 				return
 			case p.in <- &payload.packets[i]:
 			}
