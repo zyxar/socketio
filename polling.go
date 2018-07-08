@@ -2,6 +2,7 @@ package engio
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
@@ -17,6 +18,7 @@ var (
 	ErrPollingConnReadTimeout  = errors.New("polling connection read timeout")
 	ErrPollingConnWriteTimeout = errors.New("polling connection write timeout")
 	ErrPollingConnPaused       = errors.New("polling connection paused")
+	ErrPollingRequestCanceled  = errors.New("polling request canceled")
 )
 
 type pollingConn struct {
@@ -74,7 +76,7 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 	}
 }
 
-func (p *pollingConn) ReadPacketOut() (*Packet, error) {
+func (p *pollingConn) ReadPacketOut(ctx context.Context) (*Packet, error) {
 	if p.isClosed() {
 		return nil, ErrPollingConnClosed
 	}
@@ -88,6 +90,8 @@ func (p *pollingConn) ReadPacketOut() (*Packet, error) {
 		return pkt, nil
 	case <-p.pauseChan():
 		return &Packet{msgType: MessageTypeString, pktType: PacketTypeNoop}, nil
+	case <-ctx.Done():
+		return nil, ErrPollingRequestCanceled
 	}
 }
 
@@ -129,7 +133,7 @@ func (p *pollingConn) SetWriteDeadline(t time.Time) error {
 func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		pkt, err := p.ReadPacketOut()
+		pkt, err := p.ReadPacketOut(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
