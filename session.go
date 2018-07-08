@@ -6,12 +6,14 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type session struct {
 	*Socket
-	id string
+	id      string
+	barrier atomic.Value
 }
 
 func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -22,13 +24,32 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
 	id := generateRandomKey(24)
-	return &session{
+	s := &session{
 		Socket: &Socket{
 			Conn:          conn,
 			eventHandlers: newEventHandlers(),
 			readTimeout:   readTimeout,
 			writeTimeout:  writeTimeout},
 		id: base64.StdEncoding.EncodeToString(id),
+	}
+	pauseChan := make(chan struct{})
+	close(pauseChan)
+	s.barrier.Store(pauseChan)
+	return s
+}
+
+func (s *session) Pause() {
+	pauseChan := make(chan struct{})
+	s.barrier.Store(pauseChan)
+}
+
+func (s *session) Resume() {
+	close(s.barrier.Load().(chan struct{}))
+}
+
+func (s *session) CheckPaused() {
+	select {
+	case <-s.barrier.Load().(chan struct{}):
 	}
 }
 

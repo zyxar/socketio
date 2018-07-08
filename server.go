@@ -23,6 +23,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
 	}
+
 	go func() {
 		for {
 			select {
@@ -38,6 +39,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 					for {
 						if err := so.Handle(); err != nil {
 							if err == ErrPollingConnPaused {
+								ß.CheckPaused()
 								continue
 							}
 							println(err.Error())
@@ -99,7 +101,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			ß.Pause()
 			ß.Upgrade(acceptor, conn)
+			ß.Resume()
 		}
 	}
 	ß.ServeHTTP(w, r)
