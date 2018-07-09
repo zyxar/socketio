@@ -58,9 +58,13 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 	t := p.readDeadline.Load()
 	if t != nil {
 		deadline := t.(time.Time)
-		timeout := deadline.Sub(time.Now())
-		if timeout > 0 {
-			timer = time.After(timeout)
+		if !deadline.IsZero() {
+			timeout := deadline.Sub(time.Now())
+			if timeout > 0 {
+				timer = time.After(timeout)
+			} else {
+				return nil, ErrPollingConnReadTimeout
+			}
 		}
 	}
 	select {
@@ -105,9 +109,13 @@ func (p *pollingConn) WritePacket(pkt *Packet) error {
 	t := p.writeDeadline.Load()
 	if t != nil {
 		deadline := t.(time.Time)
-		timeout := deadline.Sub(time.Now())
-		if timeout > 0 {
-			timer = time.After(timeout)
+		if !deadline.IsZero() {
+			timeout := deadline.Sub(time.Now())
+			if timeout > 0 {
+				timer = time.After(timeout)
+			} else {
+				return ErrPollingConnWriteTimeout
+			}
 		}
 	}
 	select {

@@ -21,6 +21,10 @@ func TestPollingConn(t *testing.T) {
 	if err != ErrPollingConnWriteTimeout {
 		t.Error("should be timeout, but:", err)
 	}
+
+	conn.SetReadDeadline(time.Time{})
+	conn.SetWriteDeadline(time.Time{})
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
