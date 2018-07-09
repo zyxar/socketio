@@ -2,16 +2,9 @@ package engio
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sync"
 	"time"
-)
-
-var (
-	ErrInvalidMessage   = errors.New("invalid message")
-	ErrUnexpectedPacket = errors.New("unexpected packet")
-	ErrInvalidEvent     = errors.New("invalid event")
 )
 
 type Client struct {
@@ -33,7 +26,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 		return
 	}
 	if p.pktType != PacketTypeOpen {
-		err = ErrUnexpectedPacket
+		err = ErrInvalidPayload
 		return
 	}
 	var param Parameters

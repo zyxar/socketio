@@ -31,7 +31,7 @@ func (w *websocketConn) nextWriter(msgType MessageType, pt PacketType) (io.Write
 	case MessageTypeBinary:
 		m = websocket.BinaryMessage
 	default:
-		return nil, ErrInvalidMessage
+		return nil, ErrInvalidPayload
 	}
 
 	wc, err := w.conn.NextWriter(m)
@@ -85,7 +85,7 @@ func (w *websocketConn) ReadPacket() (p *Packet, err error) {
 	case websocket.BinaryMessage:
 		p = &Packet{MessageTypeBinary, PacketType(b[0]), nil}
 	default:
-		return nil, ErrInvalidMessage
+		return nil, ErrInvalidPayload
 	}
 
 	var buffer bytes.Buffer

@@ -1,8 +1,13 @@
 package engio
 
 import (
+	"errors"
 	"sync"
 	"time"
+)
+
+var (
+	ErrInvalidEvent = errors.New("invalid event")
 )
 
 type event string
@@ -77,7 +82,7 @@ func (e *eventHandlers) handle(so *Socket) error {
 	case PacketTypeNoop:
 		// noop
 	default:
-		return ErrInvalidMessage
+		return ErrInvalidPayload
 	}
 	return nil
 }
