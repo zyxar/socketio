@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	errInvalidPayload = errors.New("invalid payload")
+	ErrInvalidPayload = errors.New("invalid payload")
 )
 
 type ByterReader interface {
@@ -19,6 +19,7 @@ type ByterReader interface {
 
 type Payload struct {
 	packets []Packet
+	xhr2    bool
 }
 
 func (p *Payload) ReadFrom(r io.Reader) (n int64, err error) {
@@ -29,17 +30,32 @@ func (p *Payload) ReadFrom(r io.Reader) (n int64, err error) {
 }
 
 func (p *Payload) readFrom(r ByterReader) (n int64, err error) {
-	for {
-		var pkt Packet
-		nn, err := pkt.Decode(r)
-		n += int64(nn)
-		if err != nil {
-			if err == io.EOF {
-				return n, nil
+	if p.xhr2 {
+		for {
+			var pkt Packet2
+			nn, err := pkt.Decode(r)
+			n += int64(nn)
+			if err != nil {
+				if err == io.EOF {
+					return n, nil
+				}
+				return n, err
 			}
-			return n, err
+			p.packets = append(p.packets, Packet{pkt.msgType, pkt.pktType, pkt.data})
 		}
-		p.packets = append(p.packets, pkt)
+	} else {
+		for {
+			var pkt Packet
+			nn, err := pkt.Decode(r)
+			n += int64(nn)
+			if err != nil {
+				if err == io.EOF {
+					return n, nil
+				}
+				return n, err
+			}
+			p.packets = append(p.packets, pkt)
+		}
 	}
 	return
 }
@@ -49,11 +65,21 @@ func (p Payload) WriteTo(w io.Writer) (n int64, err error) {
 		return
 	}
 	var nn int64
-	for i := range p.packets {
-		nn, err = p.packets[i].WriteTo(w)
-		n += nn
-		if err != nil {
-			return
+	if p.xhr2 {
+		for i := range p.packets {
+			nn, err = p.packets[i].Packet2().WriteTo(w)
+			n += nn
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		for i := range p.packets {
+			nn, err = p.packets[i].WriteTo(w)
+			n += nn
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
@@ -64,6 +90,8 @@ type Packet struct {
 	pktType PacketType
 	data    []byte
 }
+
+type Packet2 Packet
 
 func (p *Packet) encode() (int, []byte, []byte) {
 	length := len(p.data)
@@ -146,7 +174,7 @@ func (p *Packet) decode(r io.ByteReader) (n int, length int, err error) {
 			break
 		}
 		if b < '0' || b > '9' {
-			return n, 0, errInvalidPayload
+			return n, 0, ErrInvalidPayload
 		}
 		length = length*10 + int(b-'0')
 	}
@@ -169,4 +197,85 @@ func (p *Packet) decode(r io.ByteReader) (n int, length int, err error) {
 	length--
 	p.pktType = PacketType(b - '0')
 	return
+}
+
+func (p *Packet) Packet2() *Packet2 {
+	p2 := Packet2(*p)
+	return &p2
+}
+
+func (p *Packet2) WriteTo(w io.Writer) (n int64, err error) {
+	if _, err = w.Write([]byte{byte(p.msgType)}); err != nil {
+		return
+	}
+	n += 1
+	length := len(p.data) + 1
+	lb := make([]byte, 0, 8)
+	for length > 0 {
+		b := byte(length % 10)
+		lb = append(lb, b)
+		length /= 10
+	}
+	buf := make([]byte, 0, len(lb)+2)
+	for i := len(lb); i > 0; i-- {
+		buf = append(buf, lb[i-1])
+	}
+	buf = append(buf, 0xFF, byte(p.pktType))
+	nn, err := w.Write(buf)
+	if err != nil {
+		return
+	}
+	n += int64(nn)
+	nn, err = w.Write(p.data)
+	n += int64(nn)
+	return
+}
+
+func (p *Packet2) decode(r io.ByteReader) (n int, length int, err error) {
+	b, err := r.ReadByte()
+	if err != nil {
+		return
+	}
+	n++
+	if b > 1 {
+		err = ErrInvalidPayload
+		return
+	}
+	p.msgType = MessageType(b)
+	for {
+		b, err = r.ReadByte()
+		if err != nil {
+			return
+		}
+		n++
+		if b == 0xFF {
+			break
+		}
+		if b > 9 {
+			err = ErrInvalidPayload
+			return
+		}
+		length = length*10 + int(b)
+	}
+	b, err = r.ReadByte()
+	if err != nil {
+		return
+	}
+	n++
+	p.pktType = PacketType(b)
+	length--
+	return
+}
+
+func (p *Packet2) Decode(pr ByterReader) (int, error) {
+	n, l, err := p.decode(pr)
+	if err != nil {
+		return n, err
+	}
+	p.data = make([]byte, l)
+	if l == 0 {
+		return n, nil
+	}
+	nn, err := pr.Read(p.data)
+	return n + nn, err
 }

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"mime"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -140,17 +142,37 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		q := r.URL.Query()
+		b64 := q.Get(queryBase64)
 		if jsonp := q.Get(queryJSONP); jsonp != "" {
 			err = writeJSONP(w, jsonp, pkt)
-		} else {
+		} else if b64 == "1" {
 			err = writeXHR(w, pkt)
+		} else {
+			err = writeXHR2(w, pkt.Packet2())
 		}
 		if err != nil {
 			println(err.Error())
 		}
 	case "POST":
 		var payload Payload
-		_, err := payload.ReadFrom(r.Body)
+		mediatype, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		switch mediatype {
+		case "application/octet-stream":
+			payload.xhr2 = true
+		case "text/plain":
+			if strings.ToLower(params["charset"]) != "utf-8" {
+				http.Error(w, "invalid charset", http.StatusBadRequest)
+				return
+			}
+		default:
+			http.Error(w, "invalid media type", http.StatusBadRequest)
+			return
+		}
+		_, err = payload.ReadFrom(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -206,6 +228,14 @@ func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 
 func writeXHR(w http.ResponseWriter, wt io.WriterTo) error {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	if _, err := wt.WriteTo(w); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeXHR2(w http.ResponseWriter, wt io.WriterTo) error {
+	w.Header().Set("Content-Type", "application/octet-stream")
 	if _, err := wt.WriteTo(w); err != nil {
 		return err
 	}
