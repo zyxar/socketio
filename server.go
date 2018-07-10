@@ -1,6 +1,7 @@
 package engio
 
 import (
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -42,7 +43,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 								ß.CheckPaused()
 								continue
 							}
-							println(err.Error())
+							log.Println("handle:", err.Error())
 							so.fire(so, EventClose, MessageTypeString, nil)
 							return
 						}
@@ -62,10 +63,15 @@ func (s *Server) Close() (err error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	println(r.Method, r.URL.RawQuery)
-	acceptor := getAcceptor(query.Get(queryTransport))
+	log.Println(r.RemoteAddr, r.Method, r.URL.RawQuery)
 
+	query := r.URL.Query()
+	if query.Get(queryEIO) != Version {
+		http.Error(w, "protocol version incompatible", http.StatusBadRequest)
+		return
+	}
+
+	acceptor := getAcceptor(query.Get(queryTransport))
 	if acceptor == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return

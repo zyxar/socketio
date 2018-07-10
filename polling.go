@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"strings"
@@ -159,7 +160,7 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = writeXHR2(w, pkt.Packet2())
 		}
 		if err != nil {
-			println(err.Error())
+			log.Println("polling:", err.Error())
 		}
 	case "POST":
 		var payload Payload
