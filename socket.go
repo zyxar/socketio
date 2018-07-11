@@ -1,7 +1,9 @@
 package socketio
 
 import (
+	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/zyxar/socketio/engine"
 )
@@ -9,6 +11,9 @@ import (
 type Socket struct {
 	so     *engine.Socket
 	parser Parser
+
+	id     uint64
+	ackmap sync.Map
 
 	handlers map[string]*handleFn
 	sync.RWMutex
@@ -27,13 +32,38 @@ func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 
 func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 	data := []interface{}{event}
-	data = append(data, args...)
-	b, _ := s.parser.Encode(&Packet{
+	pkt := &Packet{
 		Type:      PacketTypeEvent,
 		Namespace: "/",
-		Data:      data,
-	})
+	}
+	for i := range args {
+		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
+			id := s.genid()
+			s.ackmap.Store(id, newHandleFn(args[i]))
+			pkt.ID = newid(id)
+		} else {
+			data = append(data, args[i])
+		}
+	}
+	pkt.Data = data
+	b, _ := s.parser.Encode(pkt)
 	return s.so.Emit(engine.EventMessage, b)
+}
+
+func (s *Socket) Ack(pkt *Packet) (err error) {
+	pkt.Type = PacketTypeAck
+	b, err := s.parser.Encode(pkt)
+	if err != nil {
+		return
+	}
+	return s.so.Emit(engine.EventMessage, b)
+}
+
+func (s *Socket) onAck(id uint64, data []byte) {
+	if fn, ok := s.ackmap.Load(id); ok {
+		s.ackmap.Delete(id)
+		fn.(*handleFn).Call(data)
+	}
 }
 
 func (s *Socket) On(event string, callback interface{}) {
@@ -42,15 +72,20 @@ func (s *Socket) On(event string, callback interface{}) {
 	s.Unlock()
 }
 
-func (s *Socket) fire(event string, args []byte) {
+func (s *Socket) fire(event string, args []byte) ([]reflect.Value, error) {
 	s.RLock()
 	fn, ok := s.handlers[event]
 	s.RUnlock()
 	if ok {
-		fn.Call(args)
+		return fn.Call(args)
 	}
+	return nil, nil
 }
 
 func (s *Socket) Close() error {
 	return s.so.Close()
+}
+
+func (s *Socket) genid() uint64 {
+	return atomic.AddUint64(&s.id, 1)
 }

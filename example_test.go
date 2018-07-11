@@ -11,7 +11,11 @@ func ExampleServer() {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
 		so.On("message", func(data string) {
-			so.Emit("event", "echo:", data)
+			so.Emit("ack", "woot", func(msg string) {
+			})
+		})
+		so.On("foobar", func(data string) (string, string) {
+			return "foo", "bar"
 		})
 		go func() {
 			for {

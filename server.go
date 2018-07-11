@@ -53,11 +53,30 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			case PacketTypeDisconnect:
 				socket.Close()
 			case PacketTypeEvent:
-				if p.event == nil {
-					return
+				if p.event != nil {
+					v, err := socket.fire(p.event.name, p.event.data)
+					if err != nil {
+						log.Println("fire:", err.Error())
+						return
+					}
+					if p.ID != nil {
+						p.Data = nil
+						if v != nil {
+							d := make([]interface{}, len(v))
+							for i := range d {
+								d[i] = v[i].Interface()
+							}
+							p.Data = d
+						}
+						if err = socket.Ack(p); err != nil {
+							log.Println("ack:", err.Error())
+						}
+					}
 				}
-				socket.fire(p.event.name, p.event.data)
 			case PacketTypeAck:
+				if p.ID != nil && p.event != nil {
+					socket.onAck(*p.ID, p.event.data)
+				}
 			case PacketTypeError:
 			case PacketTypeBinaryEvent:
 			case PacketTypeBinaryAck:

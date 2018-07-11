@@ -138,6 +138,9 @@ func (defaultParser) Decode(s []byte) (p *Packet, err error) {
 			}
 		}
 		return p, nil
+	} else if p.Type == PacketTypeAck {
+		p.event = &eventArgs{data: s[i:]}
+		return p, nil
 	}
 	return p, json.Unmarshal(s[i:], &p.Data)
 }
