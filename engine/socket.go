@@ -103,8 +103,10 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 		}
 	}
 
+	s.RLock()
 	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
 	err = s.Conn.WritePacket(&Packet{msgType, pktType, data})
+	s.RUnlock()
 	return
 }
 
