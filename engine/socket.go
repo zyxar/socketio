@@ -12,6 +12,7 @@ type Socket struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	transport    string
+	*emitter
 	sync.RWMutex
 }
 
@@ -80,11 +81,6 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 	// case EventUpgrade:
 	case EventPing:
 		pktType = PacketTypePing
-		defer func() {
-			if err == nil {
-				s.fire(s, EventPing, msgType, nil)
-			}
-		}()
 	case EventPong:
 		pktType = PacketTypePong
 	default:
@@ -104,9 +100,13 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 	}
 
 	s.RLock()
-	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-	err = s.Conn.WritePacket(&Packet{msgType, pktType, data})
+	object := &object{
+		conn:    s.Conn,
+		p:       &Packet{msgType, pktType, data},
+		timeout: s.writeTimeout,
+	}
 	s.RUnlock()
+	s.submit(object)
 	return
 }
 

@@ -11,19 +11,26 @@ type Server struct {
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	ßchan        chan *session
+	done         chan struct{}
 	once         sync.Once
 	*sessionManager
 	*eventHandlers
+	*emitter
 }
 
 func NewServer(interval, timeout time.Duration) (*Server, error) {
+	done := make(chan struct{})
 	s := &Server{
 		pingInterval:   interval,
 		pingTimeout:    timeout,
 		ßchan:          make(chan *session, 1),
+		done:           done,
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
+		emitter:        newEmitter(64, done),
 	}
+
+	go s.emitter.loop()
 
 	go func() {
 		for {
@@ -57,6 +64,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 
 func (s *Server) Close() (err error) {
 	s.once.Do(func() {
+		close(s.done)
 		close(s.ßchan)
 	})
 	return
@@ -85,7 +93,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
+		ß = s.NewSession(conn, s.emitter, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.transport = acceptor.Transport()
 		ß.Emit(EventOpen, &Parameters{
 			SID:          ß.id,
