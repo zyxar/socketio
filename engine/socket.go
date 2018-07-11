@@ -91,10 +91,18 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 		err = ErrInvalidEvent
 		return
 	}
-	data, err := json.Marshal(args)
-	if err != nil {
-		return
+	var data []byte
+	if d, ok := args.([]byte); ok {
+		data = d
+	} else if s, ok := args.(string); ok {
+		data = []byte(s)
+	} else {
+		data, err = json.Marshal(args)
+		if err != nil {
+			return
+		}
 	}
+
 	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
 	err = s.Conn.WritePacket(&Packet{msgType, pktType, data})
 	return
