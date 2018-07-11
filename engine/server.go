@@ -101,14 +101,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid session", http.StatusBadRequest)
 			return
 		}
-		if ß.transport != acceptor.Transport() {
+		transport := acceptor.Transport()
+		if ß.transport != transport {
 			conn, err := acceptor.Accept(w, r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			ß.Pause()
-			ß.Upgrade(acceptor, conn)
+			ß.upgrade(transport, conn)
 			ß.Resume()
 		}
 	}

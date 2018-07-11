@@ -15,7 +15,7 @@ type Socket struct {
 	sync.RWMutex
 }
 
-func (s *Socket) Upgrade(acceptor Acceptor, newConn Conn) {
+func (s *Socket) upgrade(transport string, newConn Conn) {
 	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
 	p, err := newConn.ReadPacket()
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *Socket) Upgrade(acceptor Acceptor, newConn Conn) {
 
 	s.Lock()
 	s.Conn = newConn
-	s.transport = acceptor.Transport()
+	s.transport = transport
 	s.Unlock()
 	s.fire(s, EventUpgrade, p.msgType, p.data)
 	return
