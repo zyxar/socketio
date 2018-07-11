@@ -10,11 +10,18 @@ import (
 func ExampleServer() {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
-		so.OnEvent("message", func(data interface{}) {
-
+		so.On("message", func(data string) {
+			so.Emit("event", "echo:", data)
 		})
+		go func() {
+			for {
+				select {
+				case <-time.After(time.Second * 2):
+					so.Emit("event", "check it out!")
+				}
+			}
+		}()
 		return so.Emit("event", "hello world!")
 	})
 	http.ListenAndServe(":8081", server)
-	// Output:
 }

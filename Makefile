@@ -18,4 +18,4 @@ install-%:
 install: install-$(shell $(GO) env GOOS)
 
 test:
-	go test -v -race -cover
+	$(GO) test -v -race -cover

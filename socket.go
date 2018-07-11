@@ -10,18 +10,8 @@ type Socket struct {
 	so     *engine.Socket
 	parser Parser
 
-	handlers map[string]callable
+	handlers map[string]*handleFn
 	sync.RWMutex
-}
-
-type callable interface {
-	Call(data interface{})
-}
-
-type callfn func(data interface{})
-
-func (c callfn) Call(data interface{}) {
-	c(data)
 }
 
 func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
@@ -32,7 +22,7 @@ func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 	if err := so.Emit(engine.EventMessage, b); err != nil {
 		return nil, err
 	}
-	return &Socket{so: so, parser: parser, handlers: make(map[string]callable)}, nil
+	return &Socket{so: so, parser: parser, handlers: make(map[string]*handleFn)}, nil
 }
 
 func (s *Socket) Emit(event string, args ...interface{}) (err error) {
@@ -46,24 +36,18 @@ func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 	return s.so.Emit(engine.EventMessage, b)
 }
 
-func (s *Socket) On(event string, callback callable) {
+func (s *Socket) On(event string, callback interface{}) {
 	s.Lock()
-	s.handlers[event] = callback
+	s.handlers[event] = newHandleFn(callback)
 	s.Unlock()
 }
 
-func (s *Socket) OnEvent(event string, callback callfn) {
-	s.Lock()
-	s.handlers[event] = callback
-	s.Unlock()
-}
-
-func (s *Socket) fire(event string, args ...interface{}) {
+func (s *Socket) fire(event string, args []byte) {
 	s.RLock()
-	callable, ok := s.handlers[event]
+	fn, ok := s.handlers[event]
 	s.RUnlock()
 	if ok {
-		callable.Call(args)
+		fn.Call(args)
 	}
 }
 

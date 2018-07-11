@@ -1,7 +1,6 @@
 package socketio
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,12 @@ type Packet struct {
 	Namespace string
 	Data      interface{}
 	ID        *uint64
+	event     *eventArgs
+}
+
+type eventArgs struct {
+	name string
+	data []byte
 }
 
 type üWriter interface {
@@ -26,13 +31,11 @@ type üWriter interface {
 }
 
 type Encoder interface {
-	EncodeTo(w üWriter, p *Packet) error
 	Encode(p *Packet) ([]byte, error)
 }
 
 type Decoder interface {
 	Decode(s []byte) (p *Packet, err error)
-	DecodeFrom(rd io.Reader) (p *Packet, err error)
 }
 
 type Parser interface {
@@ -47,13 +50,13 @@ var DefaultParser Parser = &defaultParser{}
 
 func (d defaultParser) Encode(p *Packet) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := d.EncodeTo(&buf, p); err != nil {
+	if err := d.encodeTo(&buf, p); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func (defaultParser) EncodeTo(w üWriter, p *Packet) (err error) {
+func (defaultParser) encodeTo(w üWriter, p *Packet) (err error) {
 	if err = w.WriteByte(byte(p.Type) + '0'); err != nil {
 		return
 	}
@@ -114,62 +117,29 @@ func (defaultParser) Decode(s []byte) (p *Packet, err error) {
 			return p, nil
 		}
 	}
-	return p, json.Unmarshal([]byte(s[i:]), &p.Data)
-}
-
-func (defaultParser) DecodeFrom(rd io.Reader) (p *Packet, err error) {
-	r := bufio.NewReader(rd)
-	b, err := r.ReadByte()
-	if err != nil {
-		return
-	}
-	t := PacketType(b - '0')
-	if t > PacketTypeBinaryAck {
-		err = ErrUnknownPacket
-		return
-	}
-	p = &Packet{Type: t}
-	b, err = r.ReadByte()
-	if err != nil {
-		return
-	}
-	if b == '/' { // decode nsp
-		nsp, err := r.ReadString(',')
-		if err != nil {
-			if err == io.EOF {
-				p.Namespace = "/" + nsp
-				return p, nil
+	if p.Type == PacketTypeEvent { // extracts event but leaves data
+		if s[i] == '[' {
+			var event string
+			j := i + 1
+			for j < len(s) && s[j] != ',' && s[j] != ']' {
+				j++
 			}
-			return nil, err
-		}
-		p.Namespace = "/" + nsp[:len(nsp)-1]
-	} else {
-		r.UnreadByte()
-		p.Namespace = "/"
-	}
-
-	var id uint64
-	for { // decode id
-		b, err = r.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-				break
+			if j > i+1 {
+				if err = json.Unmarshal(s[i+1:j], &event); err != nil {
+					return nil, err
+				}
+				if s[j] == ',' {
+					j++
+				}
+				dst := make([]byte, len(s[j:])+1)
+				dst[0] = '['
+				copy(dst[1:], s[j:])
+				p.event = &eventArgs{event, dst}
 			}
-			return
 		}
-		if b < '0' || b > '9' {
-			r.UnreadByte()
-			break
-		}
-		id = id*10 + uint64(b-'0')
+		return p, nil
 	}
-	p.ID = newid(id)
-	err = json.NewDecoder(r).Decode(&p.Data)
-	if err == io.EOF {
-		err = nil
-	}
-	return
+	return p, json.Unmarshal(s[i:], &p.Data)
 }
 
 func newid(id uint64) *uint64 {

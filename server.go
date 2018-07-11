@@ -39,11 +39,8 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		so.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 			switch msgType {
 			case engine.MessageTypeString:
-				log.Printf("txt: %s\n", data)
 			case engine.MessageTypeBinary:
-				log.Printf("bin: %x\n", data)
 			default:
-				log.Printf("???: %x\n", data)
 				return
 			}
 			p, err := parser.Decode(data)
@@ -56,15 +53,10 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			case PacketTypeDisconnect:
 				socket.Close()
 			case PacketTypeEvent:
-				if d, ok := p.Data.([]interface{}); ok {
-					if event, ok := d[0].(string); ok {
-						if len(d) > 1 {
-							socket.fire(event, d[1:]...)
-						} else {
-							socket.fire(event)
-						}
-					}
+				if p.event == nil {
+					return
 				}
+				socket.fire(p.event.name, p.event.data)
 			case PacketTypeAck:
 			case PacketTypeError:
 			case PacketTypeBinaryEvent:
