@@ -59,6 +59,7 @@ func (s *Socket) Upgrade(acceptor Acceptor, newConn Conn) {
 	s.Conn = newConn
 	s.transport = acceptor.Transport()
 	s.Unlock()
+	s.fire(s, EventUpgrade, p.msgType, p.data)
 	return
 }
 

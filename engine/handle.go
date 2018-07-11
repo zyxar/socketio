@@ -54,7 +54,7 @@ func (e *eventHandlers) fire(so *Socket, event event, typ MessageType, data []by
 	callable, ok := e.handlers[event]
 	e.RUnlock()
 	if ok {
-		callable.Call(so, typ, data)
+		go callable.Call(so, typ, data)
 	}
 }
 
@@ -73,12 +73,12 @@ func (e *eventHandlers) handle(so *Socket) error {
 		return so.Close()
 	case PacketTypePing:
 		so.emit(EventPong, p.msgType, p.data)
+		e.fire(so, EventPing, p.msgType, p.data)
 	case PacketTypePong:
 		e.fire(so, EventPong, p.msgType, p.data)
 	case PacketTypeMessage:
 		e.fire(so, EventMessage, p.msgType, p.data)
 	case PacketTypeUpgrade:
-		e.fire(so, EventUpgrade, p.msgType, p.data)
 	case PacketTypeNoop:
 		// noop
 	default:
