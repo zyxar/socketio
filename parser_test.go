@@ -5,8 +5,10 @@ import (
 )
 
 func TestParserEncodeDecodeString(t *testing.T) {
+	encoder := DefaultParser.Encoder()
+	decoder := DefaultParser.Decoder()
 	for i := range packets {
-		if encoded, err := DefaultParser.Encode(&packets[i]); err != nil {
+		if encoded, err := encoder.Encode(&packets[i]); err != nil {
 			t.Error(i, err.Error())
 		} else if string(encoded) != encodedData[i] {
 			t.Errorf("%d: %q != %q", i, encoded, encodedData[i])
@@ -14,10 +16,11 @@ func TestParserEncodeDecodeString(t *testing.T) {
 	}
 
 	for i := range encodedData {
-		p, err := DefaultParser.Decode([]byte(encodedData[i]))
+		err := decoder.Add(MessageTypeString, []byte(encodedData[i]))
 		if err != nil {
 			t.Error(i, err.Error())
 		}
+		p := <-decoder.Decoded()
 		if !equalPacket(p, &packets[i]) {
 			t.Errorf("%d: %s decoded error", i, encodedData[i])
 		}

@@ -32,7 +32,9 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 
 		if server.onConnect != nil {
 			if err = server.onConnect(socket); err != nil {
-				log.Println("on connect:", err)
+				if socket.onError != nil {
+					socket.onError(err)
+				}
 			}
 		}
 
@@ -43,50 +45,19 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			default:
 				return
 			}
-			p, err := parser.Decode(data)
-			if err != nil {
-				log.Println("parser:", err.Error())
-				return
+			if err := socket.decoder.Add(msgType, data); err != nil {
+				if socket.onError != nil {
+					socket.onError(err)
+				}
 			}
-			switch p.Type {
-			case PacketTypeConnect:
-			case PacketTypeDisconnect:
-				socket.Close()
-			case PacketTypeEvent:
-				if p.event != nil {
-					v, err := socket.fire(p.event.name, p.event.data)
-					if err != nil {
-						log.Println("fire:", err.Error())
-						return
-					}
-					if p.ID != nil {
-						p.Data = nil
-						if v != nil {
-							d := make([]interface{}, len(v))
-							for i := range d {
-								d[i] = v[i].Interface()
-							}
-							p.Data = d
-						}
-						if err = socket.Ack(p); err != nil {
-							log.Println("ack:", err.Error())
-						}
-					}
-				}
-			case PacketTypeAck:
-				if p.ID != nil && p.event != nil {
-					socket.onAck(*p.ID, p.event.data)
-				}
-			case PacketTypeError:
-			case PacketTypeBinaryEvent:
-			case PacketTypeBinaryAck:
-			default:
-				log.Println("packet: ", p.Type)
+			if p := socket.yield(); p != nil {
+				socket.process(p)
 			}
 		}))
 
 		so.On(engine.EventClose, engine.Callback(func(_ *engine.Socket, _ engine.MessageType, _ []byte) {
 			log.Println("socket close")
+			socket.Close()
 		}))
 	}))
 

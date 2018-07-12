@@ -1,6 +1,7 @@
 package socketio_test
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -14,8 +15,15 @@ func ExampleServer() {
 			so.Emit("ack", "woot", func(msg string) {
 			})
 		})
+		so.On("binary", func(data interface{}) {
+			log.Println(data)
+		})
 		so.On("foobar", func(data string) (string, string) {
+			log.Println("foobar:", data)
 			return "foo", "bar"
+		})
+		so.OnError(func(err error) {
+			log.Println("socket error:", err)
 		})
 		go func() {
 			for {

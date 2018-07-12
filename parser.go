@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"strconv"
+
+	"github.com/zyxar/socketio/engine"
 )
 
 var (
@@ -17,7 +19,9 @@ type Packet struct {
 	Namespace string
 	Data      interface{}
 	ID        *uint64
-	event     *eventArgs
+
+	event       *eventArgs
+	attachments int
 }
 
 type eventArgs struct {
@@ -35,20 +39,30 @@ type Encoder interface {
 }
 
 type Decoder interface {
-	Decode(s []byte) (p *Packet, err error)
+	Add(msgType MessageType, data []byte) error
+	Decoded() <-chan *Packet
 }
 
 type Parser interface {
-	Encoder
-	Decoder
+	Encoder() Encoder
+	Decoder() Decoder
 }
 
-type defaultParser struct {
-}
+type defaultParser struct{}
 
 var DefaultParser Parser = &defaultParser{}
 
-func (d defaultParser) Encode(p *Packet) ([]byte, error) {
+func (defaultParser) Encoder() Encoder {
+	return &defaultEncoder{}
+}
+
+func (defaultParser) Decoder() Decoder {
+	return newDefaultDecoder()
+}
+
+type defaultEncoder struct{}
+
+func (d defaultEncoder) Encode(p *Packet) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := d.encodeTo(&buf, p); err != nil {
 		return nil, err
@@ -56,7 +70,7 @@ func (d defaultParser) Encode(p *Packet) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (defaultParser) encodeTo(w üWriter, p *Packet) (err error) {
+func (defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
 	if err = w.WriteByte(byte(p.Type) + '0'); err != nil {
 		return
 	}
@@ -79,13 +93,74 @@ func (defaultParser) encodeTo(w üWriter, p *Packet) (err error) {
 	return
 }
 
-func (defaultParser) Decode(s []byte) (p *Packet, err error) {
+type defaultDecoder struct {
+	packets chan *Packet
+	lastp   *Packet
+}
+
+func newDefaultDecoder() *defaultDecoder {
+	return &defaultDecoder{
+		packets: make(chan *Packet, 8),
+	}
+}
+
+func (d *defaultDecoder) Decoded() <-chan *Packet {
+	return d.packets
+}
+
+func (d *defaultDecoder) Add(msgType MessageType, data []byte) error {
+	if msgType != MessageTypeString {
+		if d.lastp == nil {
+			return ErrUnknownPacket
+		}
+		d.lastp.attachments-- // ignore binary data
+	} else {
+		p, err := d.decode(data)
+		if err != nil {
+			return err
+		}
+		d.lastp = p
+	}
+
+	if d.lastp.attachments == 0 {
+		d.emit()
+	}
+
+	return nil
+}
+
+func (d *defaultDecoder) emit() {
+	select {
+	case d.packets <- d.lastp:
+		d.lastp = nil
+	}
+}
+
+func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 	b := PacketType(s[0] - '0')
 	if b > PacketTypeBinaryAck {
 		return nil, ErrUnknownPacket
 	}
 	p = &Packet{Type: b}
-	i := 1           // skip 1st byte
+	i := 1 // skip 1st byte
+
+	if p.Type == PacketTypeBinaryEvent || p.Type == PacketTypeBinaryAck {
+		j := i
+		for ; j < len(s); j++ {
+			if s[j] == '-' {
+				break
+			}
+			if s[j] < '0' || s[j] > '9' {
+				return nil, ErrUnknownPacket
+			}
+			p.attachments = p.attachments*10 + int(s[j]-'0')
+		}
+		i = j + 1
+		if i >= len(s) {
+			return p, nil
+		}
+	}
+
 	if s[i] == '/' { // decode nsp
 		j := i + 1
 		for ; j < len(s); j++ {
@@ -117,7 +192,7 @@ func (defaultParser) Decode(s []byte) (p *Packet, err error) {
 			return p, nil
 		}
 	}
-	if p.Type == PacketTypeEvent { // extracts event but leaves data
+	if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent { // extracts event but leaves data
 		if s[i] == '[' {
 			var event string
 			j := i + 1
@@ -138,10 +213,11 @@ func (defaultParser) Decode(s []byte) (p *Packet, err error) {
 			}
 		}
 		return p, nil
-	} else if p.Type == PacketTypeAck {
+	} else if p.Type == PacketTypeAck || p.Type == PacketTypeBinaryAck {
 		p.event = &eventArgs{data: s[i:]}
 		return p, nil
 	}
+
 	return p, json.Unmarshal(s[i:], &p.Data)
 }
 
@@ -150,3 +226,8 @@ func newid(id uint64) *uint64 {
 	*i = id
 	return i
 }
+
+type MessageType = engine.MessageType
+
+const MessageTypeString MessageType = engine.MessageTypeString
+const MessageTypeBinary MessageType = engine.MessageTypeBinary

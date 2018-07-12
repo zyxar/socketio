@@ -9,25 +9,33 @@ import (
 )
 
 type Socket struct {
-	so     *engine.Socket
-	parser Parser
+	so      *engine.Socket
+	encoder Encoder
+	decoder Decoder
 
 	id     uint64
 	ackmap sync.Map
 
 	handlers map[string]*handleFn
+	onError  func(err error)
 	sync.RWMutex
 }
 
 func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
-	b, _ := parser.Encode(&Packet{
+	encoder := parser.Encoder()
+	decoder := parser.Decoder()
+	b, _ := encoder.Encode(&Packet{
 		Type:      PacketTypeConnect,
 		Namespace: "/",
 	})
 	if err := so.Emit(engine.EventMessage, b); err != nil {
 		return nil, err
 	}
-	return &Socket{so: so, parser: parser, handlers: make(map[string]*handleFn)}, nil
+	return &Socket{
+		so:       so,
+		encoder:  encoder,
+		decoder:  decoder,
+		handlers: make(map[string]*handleFn)}, nil
 }
 
 func (s *Socket) Emit(event string, args ...interface{}) (err error) {
@@ -46,13 +54,13 @@ func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 		}
 	}
 	pkt.Data = data
-	b, _ := s.parser.Encode(pkt)
+	b, _ := s.encoder.Encode(pkt)
 	return s.so.Emit(engine.EventMessage, b)
 }
 
 func (s *Socket) Ack(pkt *Packet) (err error) {
 	pkt.Type = PacketTypeAck
-	b, err := s.parser.Encode(pkt)
+	b, err := s.encoder.Encode(pkt)
 	if err != nil {
 		return
 	}
@@ -82,10 +90,65 @@ func (s *Socket) fire(event string, args []byte) ([]reflect.Value, error) {
 	return nil, nil
 }
 
-func (s *Socket) Close() error {
+func (s *Socket) process(p *Packet) {
+	switch p.Type {
+	case PacketTypeConnect:
+	case PacketTypeDisconnect:
+		s.Close()
+	case PacketTypeEvent, PacketTypeBinaryEvent:
+		if p.event != nil {
+			v, err := s.fire(p.event.name, p.event.data)
+			if err != nil {
+				if s.onError != nil {
+					s.onError(err)
+				}
+				return
+			}
+			if p.ID != nil {
+				p.Data = nil
+				if v != nil {
+					d := make([]interface{}, len(v))
+					for i := range d {
+						d[i] = v[i].Interface()
+					}
+					p.Data = d
+				}
+				if err = s.Ack(p); err != nil {
+					if s.onError != nil {
+						s.onError(err)
+					}
+				}
+			}
+		}
+	case PacketTypeAck, PacketTypeBinaryAck:
+		if p.ID != nil && p.event != nil {
+			s.onAck(*p.ID, p.event.data)
+		}
+	case PacketTypeError:
+	default:
+		if s.onError != nil {
+			s.onError(ErrUnknownPacket)
+		}
+	}
+}
+
+func (s *Socket) yield() *Packet {
+	select {
+	case p := <-s.decoder.Decoded():
+		return p
+	default:
+		return nil
+	}
+}
+
+func (s *Socket) Close() (err error) {
 	return s.so.Close()
 }
 
 func (s *Socket) genid() uint64 {
 	return atomic.AddUint64(&s.id, 1)
+}
+
+func (s *Socket) OnError(fn func(err error)) {
+	s.onError = fn
 }
