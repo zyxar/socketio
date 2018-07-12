@@ -18,7 +18,7 @@ type Socket struct {
 
 	handlers map[string]*handleFn
 	onError  func(err error)
-	sync.RWMutex
+	mutex    sync.RWMutex
 }
 
 func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
@@ -40,7 +40,7 @@ func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 
 func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 	data := []interface{}{event}
-	pkt := &Packet{
+	p := &Packet{
 		Type:      PacketTypeEvent,
 		Namespace: "/",
 	}
@@ -48,19 +48,19 @@ func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
 			id := s.genid()
 			s.ackmap.Store(id, newHandleFn(args[i]))
-			pkt.ID = newid(id)
+			p.ID = newid(id)
 		} else {
 			data = append(data, args[i])
 		}
 	}
-	pkt.Data = data
-	b, _ := s.encoder.Encode(pkt)
+	p.Data = data
+	b, _ := s.encoder.Encode(p)
 	return s.so.Emit(engine.EventMessage, b)
 }
 
-func (s *Socket) Ack(pkt *Packet) (err error) {
-	pkt.Type = PacketTypeAck
-	b, err := s.encoder.Encode(pkt)
+func (s *Socket) ack(p *Packet) (err error) {
+	p.Type = PacketTypeAck
+	b, err := s.encoder.Encode(p)
 	if err != nil {
 		return
 	}
@@ -75,15 +75,15 @@ func (s *Socket) onAck(id uint64, data []byte) {
 }
 
 func (s *Socket) On(event string, callback interface{}) {
-	s.Lock()
+	s.mutex.Lock()
 	s.handlers[event] = newHandleFn(callback)
-	s.Unlock()
+	s.mutex.Unlock()
 }
 
 func (s *Socket) fire(event string, args []byte) ([]reflect.Value, error) {
-	s.RLock()
+	s.mutex.RLock()
 	fn, ok := s.handlers[event]
-	s.RUnlock()
+	s.mutex.RUnlock()
 	if ok {
 		return fn.Call(args)
 	}
@@ -113,7 +113,7 @@ func (s *Socket) process(p *Packet) {
 					}
 					p.Data = d
 				}
-				if err = s.Ack(p); err != nil {
+				if err = s.ack(p); err != nil {
 					if s.onError != nil {
 						s.onError(err)
 					}
