@@ -1,32 +1,43 @@
 package engine
 
 import (
+	"errors"
 	"time"
 )
 
-type object struct {
-	conn    Conn
-	p       *Packet
-	timeout time.Duration
-}
+var (
+	errEmitterClosed = errors.New("emitter closed")
+)
 
 type emitter struct {
-	oc   chan *object
-	done <-chan struct{}
+	so      *Socket
+	packets chan *Packet
+	done    chan struct{}
 }
 
-func newEmitter(bufSize int, done <-chan struct{}) *emitter {
+func newEmitter(so *Socket, bufSize int) *emitter {
 	return &emitter{
-		oc:   make(chan *object, bufSize),
-		done: done,
+		so:      so,
+		packets: make(chan *Packet, bufSize),
+		done:    make(chan struct{}),
 	}
 }
 
-func (e *emitter) submit(o *object) {
+func (e *emitter) close() {
+	close(e.done)
+}
+func (e *emitter) submit(p *Packet) error {
 	select {
 	case <-e.done:
-	case e.oc <- o:
+		return errEmitterClosed
+	default:
 	}
+	select {
+	case <-e.done:
+		return errEmitterClosed
+	case e.packets <- p:
+	}
+	return nil
 }
 
 func (e *emitter) loop() {
@@ -39,9 +50,11 @@ func (e *emitter) loop() {
 		select {
 		case <-e.done:
 			return
-		case o := <-e.oc:
-			o.conn.SetWriteDeadline(time.Now().Add(o.timeout))
-			o.conn.WritePacket(o.p)
+		case p := <-e.packets:
+			e.so.RLock()
+			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
+			e.so.WritePacket(p)
+			e.so.RUnlock()
 		}
 	}
 }

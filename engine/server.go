@@ -15,7 +15,6 @@ type Server struct {
 	once         sync.Once
 	*sessionManager
 	*eventHandlers
-	*emitter
 }
 
 func NewServer(interval, timeout time.Duration) (*Server, error) {
@@ -27,10 +26,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 		done:           done,
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
-		emitter:        newEmitter(64, done),
 	}
-
-	go s.emitter.loop()
 
 	go func() {
 		for {
@@ -93,7 +89,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		ß = s.NewSession(conn, s.emitter, s.pingTimeout+s.pingInterval, s.pingTimeout)
+		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.transport = acceptor.Transport()
 		ß.Emit(EventOpen, &Parameters{
 			SID:          ß.id,

@@ -22,17 +22,19 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func newSession(conn Conn, emitter *emitter, readTimeout, writeTimeout time.Duration) *session {
+func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
 	id := generateRandomKey(24)
 	s := &session{
 		Socket: &Socket{
 			Conn:          conn,
 			eventHandlers: newEventHandlers(),
-			emitter:       emitter,
 			readTimeout:   readTimeout,
 			writeTimeout:  writeTimeout},
 		id: base64.StdEncoding.EncodeToString(id),
 	}
+	emitter := newEmitter(s.Socket, 8)
+	go emitter.loop()
+	s.Socket.emitter = emitter
 	pauseChan := make(chan struct{})
 	close(pauseChan)
 	s.barrier.Store(pauseChan)
@@ -78,8 +80,8 @@ func (s *sessionManager) Remove(id string) {
 	s.Unlock()
 }
 
-func (s *sessionManager) NewSession(conn Conn, emitter *emitter, readTimeout, writeTimeout time.Duration) *session {
-	ß := newSession(conn, emitter, readTimeout, writeTimeout)
+func (s *sessionManager) NewSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
+	ß := newSession(conn, readTimeout, writeTimeout)
 	s.Lock()
 	s.ß[ß.id] = ß
 	s.Unlock()

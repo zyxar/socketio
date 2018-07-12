@@ -12,7 +12,8 @@ type Socket struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	transport    string
-	*emitter
+	emitter      *emitter
+	once         sync.Once
 	sync.RWMutex
 }
 
@@ -68,6 +69,14 @@ func (s *Socket) Handle() error {
 	return s.eventHandlers.handle(s)
 }
 
+func (s *Socket) Close() (err error) {
+	s.once.Do(func() {
+		s.emitter.close()
+		err = s.Conn.Close()
+	})
+	return
+}
+
 func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err error) {
 	var pktType PacketType
 	switch event {
@@ -99,15 +108,7 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 		}
 	}
 
-	s.RLock()
-	object := &object{
-		conn:    s.Conn,
-		p:       &Packet{msgType, pktType, data},
-		timeout: s.writeTimeout,
-	}
-	s.RUnlock()
-	s.submit(object)
-	return
+	return s.emitter.submit(&Packet{msgType, pktType, data})
 }
 
 func (s *Socket) Emit(event event, args interface{}) (err error) {
