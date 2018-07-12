@@ -28,6 +28,7 @@ type Conn interface {
 	PacketReader
 	PacketWriter
 	io.Closer
+	FlushOut() []*Packet
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
 	Pause() error

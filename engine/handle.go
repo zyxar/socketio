@@ -54,7 +54,7 @@ func (e *eventHandlers) fire(so *Socket, event event, typ MessageType, data []by
 	callable, ok := e.handlers[event]
 	e.RUnlock()
 	if ok {
-		go callable.Call(so, typ, data)
+		callable.Call(so, typ, data)
 	}
 }
 

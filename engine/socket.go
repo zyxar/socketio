@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,12 +13,44 @@ type Socket struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	transport    string
+	barrier      atomic.Value
 	emitter      *emitter
 	once         sync.Once
 	sync.RWMutex
 }
 
+func newSocket(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
+	so := &Socket{
+		Conn:          conn,
+		eventHandlers: newEventHandlers(),
+		readTimeout:   readTimeout,
+		writeTimeout:  writeTimeout}
+	emitter := newEmitter(so, 8)
+	go emitter.loop()
+	so.emitter = emitter
+	so.pause()
+	so.resume()
+	return so
+}
+
+func (s *Socket) CheckPaused() {
+	select {
+	case <-s.barrier.Load().(chan struct{}):
+	}
+}
+
+func (s *Socket) pause() {
+	pauseChan := make(chan struct{})
+	s.barrier.Store(pauseChan)
+}
+
+func (s *Socket) resume() {
+	close(s.barrier.Load().(chan struct{}))
+}
+
 func (s *Socket) upgrade(transport string, newConn Conn) {
+	s.pause()
+	defer s.resume()
 	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
 	p, err := newConn.ReadPacket()
 	if err != nil {
@@ -55,6 +88,14 @@ func (s *Socket) upgrade(transport string, newConn Conn) {
 		newConn.Close()
 		conn.Resume()
 		return
+	}
+
+	conn.Close()
+	if packets := conn.FlushOut(); packets != nil {
+		newConn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+		for _, packet := range packets {
+			newConn.WritePacket(packet)
+		}
 	}
 
 	s.Lock()

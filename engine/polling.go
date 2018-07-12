@@ -3,9 +3,9 @@ package engine
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"mime"
@@ -80,6 +80,17 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 		return nil, ErrPollingConnPaused
 	case <-timer:
 		return nil, ErrPollingConnReadTimeout
+	}
+}
+
+func (p *pollingConn) FlushOut() (packets []*Packet) {
+	for {
+		select {
+		case pkt := <-p.out:
+			packets = append(packets, pkt)
+		default:
+			return
+		}
 	}
 }
 
@@ -230,8 +241,10 @@ func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	if _, err := wt.WriteTo(&buf); err != nil {
 		return err
 	}
-	tmpl := template.JSEscapeString(buf.String())
-	_, err := fmt.Fprintf(w, `___eio[%s]("%s");`, jsonp, tmpl)
+	s := buf.String()
+	buf.Reset()
+	json.NewEncoder(&buf).Encode(s)
+	_, err := fmt.Fprintf(w, `___eio[%s]("%s");`, jsonp, buf.String())
 	return err
 }
 

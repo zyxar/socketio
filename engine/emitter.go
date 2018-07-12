@@ -51,6 +51,7 @@ func (e *emitter) loop() {
 		case <-e.done:
 			return
 		case p := <-e.packets:
+			e.so.CheckPaused()
 			e.so.RLock()
 			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
 			e.so.WritePacket(p)

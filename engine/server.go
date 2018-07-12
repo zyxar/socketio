@@ -112,9 +112,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			ß.Pause()
 			ß.upgrade(transport, conn)
-			ß.Resume()
 		}
 	}
 	ß.ServeHTTP(w, r)
