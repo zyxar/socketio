@@ -18,9 +18,8 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := NewServer(time.Second*5, time.Second*5)
-	server.On(EventOpen, Callback(func(so *Socket, _ MessageType, _ []byte) {
-		so.On(EventMessage, Callback(func(_ *Socket, typ MessageType, data []byte) {
+	server, _ := NewServer(time.Second*5, time.Second*5, func(so *Socket) {
+		so.On(EventMessage, Callback(func(typ MessageType, data []byte) {
 			switch typ {
 			case MessageTypeString:
 				fmt.Fprintf(os.Stderr, "txt: %s\n", data)
@@ -30,15 +29,15 @@ func ExampleServer() {
 				fmt.Fprintf(os.Stderr, "???: %x\n", data)
 			}
 		}))
-		so.On(EventPing, Callback(func(_ *Socket, _ MessageType, _ []byte) {
+		so.On(EventPing, Callback(func(_ MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "recv ping\n")
 		}))
-		so.On(EventClose, Callback(func(_ *Socket, _ MessageType, _ []byte) {
+		so.On(EventClose, Callback(func(_ MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "socket close\n")
 		}))
-		so.On(EventUpgrade, Callback(func(_ *Socket, _ MessageType, _ []byte) {
+		so.On(EventUpgrade, Callback(func(_ MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "socket upgrade\n")
 		}))
-	}))
+	})
 	http.ListenAndServe(":8081", server)
 }

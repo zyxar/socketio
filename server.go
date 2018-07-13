@@ -15,13 +15,7 @@ type Server struct {
 }
 
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
-	e, err := engine.NewServer(interval, timeout)
-	if err != nil {
-		return
-	}
-	server = &Server{engine: e}
-
-	e.On(engine.EventOpen, engine.Callback(func(so *engine.Socket, _ engine.MessageType, _ []byte) {
+	e, err := engine.NewServer(interval, timeout, func(so *engine.Socket) {
 		log.Println("socket open")
 
 		socket, err := newSocket(so, parser)
@@ -38,7 +32,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			}
 		}
 
-		so.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
+		so.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
 			switch msgType {
 			case engine.MessageTypeString:
 			case engine.MessageTypeBinary:
@@ -55,12 +49,15 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			}
 		}))
 
-		so.On(engine.EventClose, engine.Callback(func(_ *engine.Socket, _ engine.MessageType, _ []byte) {
+		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			log.Println("socket close")
 			socket.Close()
 		}))
-	}))
-
+	})
+	if err != nil {
+		return
+	}
+	server = &Server{engine: e}
 	return
 }
 

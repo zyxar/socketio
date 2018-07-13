@@ -102,7 +102,7 @@ func (s *Socket) upgrade(transport string, newConn Conn) {
 	s.Conn = newConn
 	s.transport = transport
 	s.Unlock()
-	s.fire(s, EventUpgrade, p.msgType, p.data)
+	s.fire(EventUpgrade, p.msgType, p.data)
 	return
 }
 

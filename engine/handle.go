@@ -22,14 +22,14 @@ const (
 	EventPong    event = "pong"    // Fired upon receiving a pong packet.
 )
 
-type Callback func(so *Socket, typ MessageType, data []byte)
+type Callback func(typ MessageType, data []byte)
 
 type Callable interface {
-	Call(so *Socket, typ MessageType, data []byte)
+	Call(typ MessageType, data []byte)
 }
 
-func (h Callback) Call(so *Socket, typ MessageType, data []byte) {
-	h(so, typ, data)
+func (h Callback) Call(typ MessageType, data []byte) {
+	h(typ, data)
 }
 
 type eventHandlers struct {
@@ -49,12 +49,12 @@ func (e *eventHandlers) On(event event, callable Callable) {
 	e.Unlock()
 }
 
-func (e *eventHandlers) fire(so *Socket, event event, typ MessageType, data []byte) {
+func (e *eventHandlers) fire(event event, typ MessageType, data []byte) {
 	e.RLock()
 	callable, ok := e.handlers[event]
 	e.RUnlock()
 	if ok {
-		callable.Call(so, typ, data)
+		callable.Call(typ, data)
 	}
 }
 
@@ -69,15 +69,15 @@ func (e *eventHandlers) handle(so *Socket) error {
 	switch p.pktType {
 	case PacketTypeOpen:
 	case PacketTypeClose:
-		e.fire(so, EventClose, p.msgType, p.data)
+		e.fire(EventClose, p.msgType, p.data)
 		return so.Close()
 	case PacketTypePing:
 		so.emit(EventPong, p.msgType, p.data)
-		e.fire(so, EventPing, p.msgType, p.data)
+		e.fire(EventPing, p.msgType, p.data)
 	case PacketTypePong:
-		e.fire(so, EventPong, p.msgType, p.data)
+		e.fire(EventPong, p.msgType, p.data)
 	case PacketTypeMessage:
-		e.fire(so, EventMessage, p.msgType, p.data)
+		e.fire(EventMessage, p.msgType, p.data)
 	case PacketTypeUpgrade:
 	case PacketTypeNoop:
 		// noop

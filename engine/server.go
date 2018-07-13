@@ -14,10 +14,9 @@ type Server struct {
 	done         chan struct{}
 	once         sync.Once
 	*sessionManager
-	*eventHandlers
 }
 
-func NewServer(interval, timeout time.Duration) (*Server, error) {
+func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, error) {
 	done := make(chan struct{})
 	s := &Server{
 		pingInterval:   interval,
@@ -25,7 +24,6 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 		ßchan:          make(chan *session, 1),
 		done:           done,
 		sessionManager: newSessionManager(),
-		eventHandlers:  newEventHandlers(),
 	}
 
 	go func() {
@@ -35,7 +33,7 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 				if !ok {
 					return
 				}
-				s.fire(ß.Socket, EventOpen, MessageTypeString, nil)
+
 				go func() {
 					so := ß.Socket
 					defer so.Close()
@@ -47,11 +45,13 @@ func NewServer(interval, timeout time.Duration) (*Server, error) {
 								continue
 							}
 							log.Println("handle:", err.Error())
-							so.fire(so, EventClose, MessageTypeString, nil)
+							so.fire(EventClose, MessageTypeString, nil)
 							return
 						}
 					}
 				}()
+
+				onOpen(ß.Socket)
 			}
 		}
 	}()
