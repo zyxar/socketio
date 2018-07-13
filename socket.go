@@ -67,10 +67,10 @@ func (s *Socket) ack(p *Packet) (err error) {
 	return s.so.Emit(engine.EventMessage, b)
 }
 
-func (s *Socket) onAck(id uint64, data []byte) {
+func (s *Socket) onAck(id uint64, data []byte, buffer [][]byte) {
 	if fn, ok := s.ackmap.Load(id); ok {
 		s.ackmap.Delete(id)
-		fn.(*handleFn).Call(data)
+		fn.(*handleFn).Call(data, buffer)
 	}
 }
 
@@ -80,12 +80,12 @@ func (s *Socket) On(event string, callback interface{}) {
 	s.mutex.Unlock()
 }
 
-func (s *Socket) fire(event string, args []byte) ([]reflect.Value, error) {
+func (s *Socket) fire(event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
 	s.mutex.RLock()
 	fn, ok := s.handlers[event]
 	s.mutex.RUnlock()
 	if ok {
-		return fn.Call(args)
+		return fn.Call(args, buffer)
 	}
 	return nil, nil
 }
@@ -97,7 +97,7 @@ func (s *Socket) process(p *Packet) {
 		s.Close()
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := s.fire(p.event.name, p.event.data)
+			v, err := s.fire(p.event.name, p.event.data, p.buffer)
 			if err != nil {
 				if s.onError != nil {
 					s.onError(err)
@@ -122,7 +122,7 @@ func (s *Socket) process(p *Packet) {
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			s.onAck(*p.ID, p.event.data)
+			s.onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
 	default:

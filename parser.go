@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 
 	"github.com/zyxar/socketio/engine"
@@ -22,6 +24,7 @@ type Packet struct {
 
 	event       *eventArgs
 	attachments int
+	buffer      [][]byte
 }
 
 type eventArgs struct {
@@ -113,7 +116,9 @@ func (d *defaultDecoder) Add(msgType MessageType, data []byte) error {
 		if d.lastp == nil {
 			return ErrUnknownPacket
 		}
-		d.lastp.attachments-- // ignore binary data
+		i := len(d.lastp.buffer) - d.lastp.attachments
+		d.lastp.buffer[i] = data
+		d.lastp.attachments--
 	} else {
 		p, err := d.decode(data)
 		if err != nil {
@@ -194,23 +199,18 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 	}
 	if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent { // extracts event but leaves data
 		if s[i] == '[' {
-			var event string
-			j := i + 1
-			for j < len(s) && s[j] != ',' && s[j] != ']' {
-				j++
-			}
-			if j > i+1 {
-				if err = json.Unmarshal(s[i+1:j], &event); err != nil {
-					return nil, err
+			text := s[i:]
+			if p.Type == PacketTypeBinaryEvent {
+				p.buffer, text = extractAttachments(text)
+				if len(p.buffer) != p.attachments {
+					return nil, ErrUnknownPacket
 				}
-				if s[j] == ',' {
-					j++
-				}
-				dst := make([]byte, len(s[j:])+1)
-				dst[0] = '['
-				copy(dst[1:], s[j:])
-				p.event = &eventArgs{event, dst}
 			}
+			event, left, match := extractEvent(text)
+			if !match {
+				return nil, ErrUnknownPacket
+			}
+			p.event = &eventArgs{name: event, data: left}
 		}
 		return p, nil
 	} else if p.Type == PacketTypeAck || p.Type == PacketTypeBinaryAck {
@@ -227,7 +227,54 @@ func newid(id uint64) *uint64 {
 	return i
 }
 
+func extractEvent(b []byte) (event string, left []byte, match bool) {
+	if sub := eventExp.FindSubmatch(b); sub != nil {
+		event = string(sub[1])
+		left = eventExp.ReplaceAll(b, []byte{'['})
+		match = true
+	}
+	return
+}
+
+func extractAttachments(b []byte) (buffer [][]byte, left []byte) {
+	if m := placeholderExp.FindAllSubmatch(b, -1); m != nil {
+		buffer = make([][]byte, len(m))
+	}
+	left = placeholderExp.ReplaceAllLiteral(b, nil)
+	return
+}
+
 type MessageType = engine.MessageType
 
 const MessageTypeString MessageType = engine.MessageTypeString
 const MessageTypeBinary MessageType = engine.MessageTypeBinary
+
+var placeholderExp = regexp.MustCompile(`\s*,\s*\{\s*"_placeholder"\s*:\s*true\s*,\s*"num"\s*:\s*\d*?\s*\}\s*`)
+var eventExp = regexp.MustCompile(`^\[\s*"(?P<event>[^"]+)"\s*,?`)
+
+type Buffer interface {
+	json.Marshaler
+	Bytes() []byte
+	Attach([]byte)
+}
+
+type Binary struct {
+	data []byte
+	num  int
+}
+
+func (b *Binary) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	if _, err := fmt.Fprintf(&buf, `{"_placeholder":true,"num":%d}`, b.num); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (b *Binary) Bytes() []byte {
+	return b.data[:]
+}
+
+func (b *Binary) Attach(p []byte) {
+	b.data = p
+}

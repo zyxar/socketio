@@ -28,15 +28,23 @@ func newHandleFn(fn interface{}) *handleFn {
 	return &handleFn{fn: v, args: args}
 }
 
-func (e *handleFn) Call(data []byte) ([]reflect.Value, error) {
-	args := make([]interface{}, len(e.args))
+func (e *handleFn) Call(data []byte, buffer [][]byte) ([]reflect.Value, error) {
+	args := make([]interface{}, 0, len(e.args))
 	in := make([]reflect.Value, len(e.args))
 	for i, typ := range e.args {
 		if typ.Kind() == reflect.Ptr {
 			typ = typ.Elem()
 		}
 		in[i] = reflect.New(typ)
-		args[i] = in[i].Interface()
+		it := in[i].Interface()
+		if b, ok := it.(Buffer); ok {
+			if len(buffer) > 0 {
+				b.Attach(buffer[0])
+				buffer = buffer[1:]
+			}
+		} else {
+			args = append(args, it)
+		}
 	}
 	if err := json.Unmarshal(data, &args); err != nil {
 		return nil, err
