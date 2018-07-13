@@ -168,7 +168,7 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if b64 == "1" {
 			err = writeXHR(w, pkt)
 		} else {
-			err = writeXHR2(w, pkt.Packet2())
+			err = writeXHR2(w, pkt.packet2())
 		}
 		if err != nil {
 			log.Println("polling:", err.Error())

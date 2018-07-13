@@ -18,7 +18,7 @@ func packetEqual(p1, p2 *Packet) bool {
 	return bytes.Compare(p1.data, p2.data) == 0
 }
 
-func packet2Equal(p1, p2 *Packet2) bool {
+func packet2Equal(p1, p2 *packet2) bool {
 	if p1 == p2 {
 		return true
 	}
@@ -63,7 +63,7 @@ func TestPacketEncodeDecode(t *testing.T) {
 	for i, d := range testData {
 		r := bytes.NewReader(d.encoded)
 		p := &Packet{}
-		if n, err := p.Decode(r); err != nil {
+		if n, err := p.decode(r); err != nil {
 			t.Error(err.Error())
 		} else {
 			if n != len(d.encoded) {
@@ -79,25 +79,25 @@ func TestPacketEncodeDecode(t *testing.T) {
 func TestPacket2EncodeDecode(t *testing.T) {
 	var testData = []struct {
 		encoded []byte
-		Packet2 *Packet2
+		packet2 *packet2
 	}{
 		{[]byte{0x00, 0x07, 0xFF, 0x04, 'H', 'E', 'L', 'L', 'O', '!'},
-			&Packet2{MessageTypeString, PacketTypeMessage, []byte("HELLO!")}},
+			&packet2{MessageTypeString, PacketTypeMessage, []byte("HELLO!")}},
 		{[]byte{0x00, 0x01, 0x03, 0xFF, 0x04, 0xe5, 0x93, 0x8e, 0xe5, 0x96, 0xb2, 0xe6, 0x88, 0x91, 0xe6, 0x93, 0x8d},
-			&Packet2{MessageTypeString, PacketTypeMessage, []byte("哎喲我操")}},
+			&packet2{MessageTypeString, PacketTypeMessage, []byte("哎喲我操")}},
 		{[]byte{0x01, 0x07, 0xFF, 0x04, 'H', 'E', 'L', 'L', 'O', '!'},
-			&Packet2{MessageTypeBinary, PacketTypeMessage, []byte("HELLO!")}},
+			&packet2{MessageTypeBinary, PacketTypeMessage, []byte("HELLO!")}},
 		{[]byte{0x01, 0x01, 0x03, 0xFF, 0x04, 0xe5, 0x93, 0x8e, 0xe5, 0x96, 0xb2, 0xe6, 0x88, 0x91, 0xe6, 0x93, 0x8d},
-			&Packet2{MessageTypeBinary, PacketTypeMessage, []byte("哎喲我操")}},
+			&packet2{MessageTypeBinary, PacketTypeMessage, []byte("哎喲我操")}},
 		{[]byte{0x00, 0x06, 0xFF, 0x02, 'p', 'r', 'o', 'b', 'e'},
-			&Packet2{MessageTypeString, PacketTypePing, []byte("probe")}},
+			&packet2{MessageTypeString, PacketTypePing, []byte("probe")}},
 		{[]byte{0x00, 0x01, 0xFF, 0x06},
-			&Packet2{MessageTypeString, PacketTypeNoop, []byte{}}},
+			&packet2{MessageTypeString, PacketTypeNoop, []byte{}}},
 	}
 	var buf bytes.Buffer
 	for i, d := range testData {
 		buf.Reset()
-		if _, err := d.Packet2.WriteTo(&buf); err != nil {
+		if _, err := d.packet2.WriteTo(&buf); err != nil {
 			t.Error(err.Error())
 		}
 		if bytes.Compare(d.encoded, buf.Bytes()) != 0 {
@@ -107,14 +107,14 @@ func TestPacket2EncodeDecode(t *testing.T) {
 
 	for i, d := range testData {
 		r := bytes.NewReader(d.encoded)
-		p := &Packet2{}
-		if n, err := p.Decode(r); err != nil {
+		p := &packet2{}
+		if n, err := p.decode(r); err != nil {
 			t.Error(err.Error())
 		} else {
 			if n != len(d.encoded) {
 				t.Errorf("%d: %d != %d", i, n, len(d.encoded))
 			}
-			if !packet2Equal(p, d.Packet2) {
+			if !packet2Equal(p, d.packet2) {
 				t.Errorf("%d: decode error: %x", i, d.encoded)
 			}
 		}

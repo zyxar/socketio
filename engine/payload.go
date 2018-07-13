@@ -12,7 +12,7 @@ var (
 	ErrInvalidPayload = errors.New("invalid payload")
 )
 
-type ByterReader interface {
+type byteReader interface {
 	io.Reader
 	io.ByteReader
 }
@@ -23,17 +23,17 @@ type Payload struct {
 }
 
 func (p *Payload) ReadFrom(r io.Reader) (n int64, err error) {
-	if rd, ok := r.(ByterReader); ok {
+	if rd, ok := r.(byteReader); ok {
 		return p.readFrom(rd)
 	}
 	return p.readFrom(bufio.NewReader(r))
 }
 
-func (p *Payload) readFrom(r ByterReader) (n int64, err error) {
+func (p *Payload) readFrom(r byteReader) (n int64, err error) {
 	if p.xhr2 {
 		for {
-			var pkt Packet2
-			nn, err := pkt.Decode(r)
+			var pkt packet2
+			nn, err := pkt.decode(r)
 			n += int64(nn)
 			if err != nil {
 				if err == io.EOF {
@@ -46,7 +46,7 @@ func (p *Payload) readFrom(r ByterReader) (n int64, err error) {
 	} else {
 		for {
 			var pkt Packet
-			nn, err := pkt.Decode(r)
+			nn, err := pkt.decode(r)
 			n += int64(nn)
 			if err != nil {
 				if err == io.EOF {
@@ -67,7 +67,7 @@ func (p Payload) WriteTo(w io.Writer) (n int64, err error) {
 	var nn int64
 	if p.xhr2 {
 		for i := range p.packets {
-			nn, err = p.packets[i].Packet2().WriteTo(w)
+			nn, err = p.packets[i].packet2().WriteTo(w)
 			n += nn
 			if err != nil {
 				return
@@ -91,9 +91,9 @@ type Packet struct {
 	data    []byte
 }
 
-type Packet2 Packet
+type packet2 Packet
 
-func (p *Packet) encode() (int, []byte, []byte) {
+func (p *Packet) encodeHead() (int, []byte, []byte) {
 	length := len(p.data)
 	var div []byte
 	dst := p.data
@@ -113,8 +113,8 @@ func (p *Packet) encode() (int, []byte, []byte) {
 	return length, div, dst
 }
 
-func (p *Packet) Encode() (encoded []byte) {
-	length, div, data := p.encode()
+func (p *Packet) encode() (encoded []byte) {
+	length, div, data := p.encodeHead()
 	ls := strconv.FormatInt(int64(length), 10)
 	ll := len(ls)
 	payloadLength := length + ll
@@ -127,7 +127,7 @@ func (p *Packet) Encode() (encoded []byte) {
 
 func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	var nn int
-	length, div, data := p.encode()
+	length, div, data := p.encodeHead()
 	ls := strconv.FormatInt(int64(length), 10)
 	nn, err = io.WriteString(w, ls)
 	n += int64(nn)
@@ -144,8 +144,8 @@ func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-func (p *Packet) Decode(pr ByterReader) (int, error) {
-	n, l, err := p.decode(pr)
+func (p *Packet) decode(pr byteReader) (int, error) {
+	n, l, err := p.decodeHead(pr)
 	if err != nil {
 		return n, err
 	}
@@ -163,7 +163,7 @@ func (p *Packet) Decode(pr ByterReader) (int, error) {
 	return n, err
 }
 
-func (p *Packet) decode(r io.ByteReader) (n int, length int, err error) {
+func (p *Packet) decodeHead(r io.ByteReader) (n int, length int, err error) {
 	for {
 		b, err := r.ReadByte()
 		if err != nil {
@@ -199,12 +199,12 @@ func (p *Packet) decode(r io.ByteReader) (n int, length int, err error) {
 	return
 }
 
-func (p *Packet) Packet2() *Packet2 {
-	p2 := Packet2(*p)
+func (p *Packet) packet2() *packet2 {
+	p2 := packet2(*p)
 	return &p2
 }
 
-func (p *Packet2) WriteTo(w io.Writer) (n int64, err error) {
+func (p *packet2) WriteTo(w io.Writer) (n int64, err error) {
 	if _, err = w.Write([]byte{byte(p.msgType)}); err != nil {
 		return
 	}
@@ -231,7 +231,7 @@ func (p *Packet2) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-func (p *Packet2) decode(r io.ByteReader) (n int, length int, err error) {
+func (p *packet2) decodeHead(r io.ByteReader) (n int, length int, err error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return
@@ -267,8 +267,8 @@ func (p *Packet2) decode(r io.ByteReader) (n int, length int, err error) {
 	return
 }
 
-func (p *Packet2) Decode(pr ByterReader) (int, error) {
-	n, l, err := p.decode(pr)
+func (p *packet2) decode(pr byteReader) (int, error) {
+	n, l, err := p.decodeHead(pr)
 	if err != nil {
 		return n, err
 	}
