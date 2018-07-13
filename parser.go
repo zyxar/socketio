@@ -300,7 +300,7 @@ type Binary struct {
 	num  int
 }
 
-func (b *Binary) MarshalJSON() ([]byte, error) {
+func (b Binary) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	if _, err := fmt.Fprintf(&buf, `{"_placeholder":true,"num":%d}`, b.num); err != nil {
 		return nil, err

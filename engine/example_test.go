@@ -1,14 +1,16 @@
-package engine
+package engine_test
 
 import (
 	"fmt"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/zyxar/socketio/engine"
 )
 
 func ExampleDial() {
-	c, err := Dial("ws://localhost:8080/engine.io/", nil, WebsocketTransport)
+	c, err := engine.Dial("ws://localhost:8080/engine.io/", nil, engine.WebsocketTransport)
 	if err != nil {
 		fmt.Printf("dial err=%s", err)
 		return
@@ -18,24 +20,24 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := NewServer(time.Second*5, time.Second*5, func(so *Socket) {
-		so.On(EventMessage, Callback(func(typ MessageType, data []byte) {
+	server, _ := engine.NewServer(time.Second*5, time.Second*5, func(so *engine.Socket) {
+		so.On(engine.EventMessage, engine.Callback(func(typ engine.MessageType, data []byte) {
 			switch typ {
-			case MessageTypeString:
+			case engine.MessageTypeString:
 				fmt.Fprintf(os.Stderr, "txt: %s\n", data)
-			case MessageTypeBinary:
+			case engine.MessageTypeBinary:
 				fmt.Fprintf(os.Stderr, "bin: %x\n", data)
 			default:
 				fmt.Fprintf(os.Stderr, "???: %x\n", data)
 			}
 		}))
-		so.On(EventPing, Callback(func(_ MessageType, _ []byte) {
+		so.On(engine.EventPing, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "recv ping\n")
 		}))
-		so.On(EventClose, Callback(func(_ MessageType, _ []byte) {
+		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "socket close\n")
 		}))
-		so.On(EventUpgrade, Callback(func(_ MessageType, _ []byte) {
+		so.On(engine.EventUpgrade, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "socket upgrade\n")
 		}))
 	})

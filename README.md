@@ -1,6 +1,8 @@
 # socketio
 
 [![GoDoc](https://godoc.org/github.com/zyxar/socketio?status.svg)](https://godoc.org/github.com/zyxar/socketio)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zyxar/socketio)](https://goreportcard.com/report/github.com/zyxar/socketio)
+
 
 [socket.io](https://socket.io/)/[engine.io](https://github.com/socketio/engine.io) in #Go
 
@@ -54,7 +56,7 @@ socket.on('connect', function() {
     }
 });
 socket.on('event', console.log);
-socket.on('disconnect', function(){
+socket.on('disconnect', function() {
     console.log('disconnected');
     if (id) {
         clearInterval(id);
@@ -71,6 +73,7 @@ Server:
 ```go
   so.On("message", func(data string) {
     so.Emit("ack", "foo", func(msg string) {
+      log.Println(msg)
     })
   })
 ```
@@ -137,4 +140,6 @@ Client:
 
 - [ ] engine.io polling client
 - [ ] socket.io client
+- [ ] Room
 - [ ] `namespace`
+- [ ] Broadcasting

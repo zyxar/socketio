@@ -57,7 +57,6 @@ func (p *Payload) readFrom(r byteReader) (n int64, err error) {
 			p.packets = append(p.packets, pkt)
 		}
 	}
-	return
 }
 
 func (p Payload) WriteTo(w io.Writer) (n int64, err error) {

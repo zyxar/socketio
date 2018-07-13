@@ -110,7 +110,7 @@ func TestBinaryEventDecode(t *testing.T) {
 		t.Error("extract attachments incorrect", len(buffer))
 	}
 
-	event, left, match := extractEvent(left)
+	event, _, match := extractEvent(left)
 	if !match || event != "abcdefg" {
 		t.Error("extract event incorrect")
 	}
