@@ -91,7 +91,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.transport = acceptor.Transport()
-		ß.Emit(EventOpen, &Parameters{
+		ß.Emit(EventOpen, MessageTypeString, &Parameters{
 			SID:          ß.id,
 			Upgrades:     []string{"websocket"},
 			PingInterval: int(s.pingInterval / time.Millisecond),

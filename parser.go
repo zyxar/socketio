@@ -38,7 +38,7 @@ type üWriter interface {
 }
 
 type Encoder interface {
-	Encode(p *Packet) ([]byte, error)
+	Encode(p *Packet) ([][]byte, error)
 }
 
 type Decoder interface {
@@ -63,19 +63,55 @@ func (defaultParser) Decoder() Decoder {
 	return newDefaultDecoder()
 }
 
+func (p *Packet) preprocess() {
+	p.attachments = 0
+	if d, ok := p.Data.([]interface{}); ok {
+		p.buffer = make([][]byte, 1, len(d)+1)
+		for i := range d {
+			if b, ok := d[i].(Buffer); ok {
+				b.SetNum(p.attachments)
+				p.attachments++
+				p.buffer = append(p.buffer, b.Bytes())
+			}
+		}
+	}
+	if p.attachments > 0 {
+		switch p.Type {
+		case PacketTypeEvent:
+			p.Type = PacketTypeBinaryEvent
+		case PacketTypeAck:
+			p.Type = PacketTypeBinaryAck
+		}
+	}
+}
+
 type defaultEncoder struct{}
 
-func (d defaultEncoder) Encode(p *Packet) ([]byte, error) {
+func (d defaultEncoder) Encode(p *Packet) ([][]byte, error) {
 	var buf bytes.Buffer
 	if err := d.encodeTo(&buf, p); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	if p.buffer == nil {
+		return [][]byte{buf.Bytes()}, nil
+	}
+	p.buffer[0] = buf.Bytes()
+	return p.buffer, nil
 }
 
 func (defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
+	p.preprocess()
+
 	if err = w.WriteByte(byte(p.Type) + '0'); err != nil {
 		return
+	}
+	if p.attachments > 0 {
+		if _, err = io.WriteString(w, strconv.Itoa(p.attachments)); err != nil {
+			return
+		}
+		if err = w.WriteByte('-'); err != nil {
+			return
+		}
 	}
 	if p.Namespace != "" && p.Namespace != "/" {
 		if _, err = io.WriteString(w, p.Namespace); err != nil {
@@ -256,6 +292,7 @@ type Buffer interface {
 	json.Marshaler
 	Bytes() []byte
 	Attach([]byte)
+	SetNum(i int)
 }
 
 type Binary struct {
@@ -277,4 +314,8 @@ func (b *Binary) Bytes() []byte {
 
 func (b *Binary) Attach(p []byte) {
 	b.data = p
+}
+
+func (b *Binary) SetNum(i int) {
+	b.num = i
 }

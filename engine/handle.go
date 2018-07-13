@@ -72,7 +72,7 @@ func (e *eventHandlers) handle(so *Socket) error {
 		e.fire(EventClose, p.msgType, p.data)
 		return so.Close()
 	case PacketTypePing:
-		so.emit(EventPong, p.msgType, p.data)
+		so.Emit(EventPong, p.msgType, p.data)
 		e.fire(EventPing, p.msgType, p.data)
 	case PacketTypePong:
 		e.fire(EventPong, p.msgType, p.data)

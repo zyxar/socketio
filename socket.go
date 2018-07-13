@@ -28,7 +28,7 @@ func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 		Type:      PacketTypeConnect,
 		Namespace: "/",
 	})
-	if err := so.Emit(engine.EventMessage, b); err != nil {
+	if err := so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
 		return nil, err
 	}
 	return &Socket{
@@ -55,7 +55,15 @@ func (s *Socket) Emit(event string, args ...interface{}) (err error) {
 	}
 	p.Data = data
 	b, _ := s.encoder.Encode(p)
-	return s.so.Emit(engine.EventMessage, b)
+	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
+		return
+	}
+	for _, d := range b[1:] {
+		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (s *Socket) ack(p *Packet) (err error) {
@@ -64,7 +72,15 @@ func (s *Socket) ack(p *Packet) (err error) {
 	if err != nil {
 		return
 	}
-	return s.so.Emit(engine.EventMessage, b)
+	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
+		return
+	}
+	for _, d := range b[1:] {
+		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (s *Socket) onAck(id uint64, data []byte, buffer [][]byte) {

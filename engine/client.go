@@ -78,7 +78,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 }
 
 func (c *Client) Ping() error {
-	return c.Emit(EventPing, nil)
+	return c.Emit(EventPing, MessageTypeString, nil)
 }
 
 func (c *Client) Close() (err error) {

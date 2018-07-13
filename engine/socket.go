@@ -118,7 +118,7 @@ func (s *Socket) Close() (err error) {
 	return
 }
 
-func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err error) {
+func (s *Socket) Emit(event event, msgType MessageType, args interface{}) (err error) {
 	var pktType PacketType
 	switch event {
 	case EventOpen:
@@ -152,10 +152,6 @@ func (s *Socket) emit(event event, msgType MessageType, args interface{}) (err e
 	return s.emitter.submit(&Packet{msgType, pktType, data})
 }
 
-func (s *Socket) Emit(event event, args interface{}) (err error) {
-	return s.emit(event, MessageTypeString, args)
-}
-
 func (s *Socket) Send(args interface{}) (err error) {
-	return s.Emit(EventMessage, args)
+	return s.Emit(EventMessage, MessageTypeString, args)
 }

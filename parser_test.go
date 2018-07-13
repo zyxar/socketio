@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -27,7 +28,7 @@ func TestParserEncodeDecodeString(t *testing.T) {
 	for i := range packets {
 		if encoded, err := encoder.Encode(&packets[i]); err != nil {
 			t.Error(i, err.Error())
-		} else if string(encoded) != encodedData[i] {
+		} else if string(encoded[0]) != encodedData[i] {
 			t.Errorf("%d: %q != %q", i, encoded, encodedData[i])
 		}
 	}
@@ -106,11 +107,39 @@ func TestBinaryEventDecode(t *testing.T) {
 
 	buffer, left := extractAttachments(text)
 	if len(buffer) != 6 {
-		t.Error("extract attachments incorrect")
+		t.Error("extract attachments incorrect", len(buffer))
 	}
 
 	event, left, match := extractEvent(left)
 	if !match || event != "abcdefg" {
 		t.Error("extract event incorrect")
+	}
+}
+
+func TestParserEncodeBinary(t *testing.T) {
+	encoder := DefaultParser.Encoder()
+	b := [][]byte{{1, 2, 3, 4}, {2, 3, 4, 6}, {4, 5, 6, 8}}
+	p := &Packet{Type: PacketTypeBinaryEvent, Namespace: "/", Data: []interface{}{"message",
+		&Binary{data: b[0]},
+		&Binary{data: b[1]},
+		"TEXT",
+		&Binary{data: b[2]},
+	}, ID: newid(1)}
+	encodedString := `53-1["message",{"_placeholder":true,"num":0},{"_placeholder":true,"num":1},"TEXT",{"_placeholder":true,"num":2}]
+`
+	encoded, err := encoder.Encode(p)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if len(encoded) != 4 {
+		t.Error("encoded length incorrect")
+	}
+	if string(encoded[0]) != encodedString {
+		t.Error("encoded string packet incorrect")
+	}
+	for i, e := range encoded[1:] {
+		if bytes.Compare(e, b[i]) != 0 {
+			t.Error("encoded binary incorrect")
+		}
 	}
 }

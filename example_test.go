@@ -15,8 +15,9 @@ func ExampleServer() {
 			so.Emit("ack", "woot", func(msg string) {
 			})
 		})
-		so.On("binary", func(data interface{}) {
+		so.On("binary", func(data interface{}, b *socketio.Binary) {
 			log.Println(data)
+			log.Printf("%x", b.Bytes())
 		})
 		so.On("foobar", func(data string) (string, string) {
 			log.Println("foobar:", data)
@@ -26,10 +27,13 @@ func ExampleServer() {
 			log.Println("socket error:", err)
 		})
 		go func() {
+			b := &socketio.Binary{}
 			for {
 				select {
 				case <-time.After(time.Second * 2):
-					so.Emit("event", "check it out!")
+					t, _ := time.Now().MarshalBinary()
+					b.Attach(t)
+					so.Emit("event", "check it out!", b)
 				}
 			}
 		}()
