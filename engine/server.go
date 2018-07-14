@@ -29,11 +29,18 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 	go func() {
 		for {
 			select {
+			case <-done:
+				return
 			case ß, ok := <-s.ßchan:
 				if !ok {
 					return
 				}
-
+				ß.Emit(EventOpen, MessageTypeString, &Parameters{
+					SID:          ß.id,
+					Upgrades:     []string{"websocket"},
+					PingInterval: int(interval / time.Millisecond),
+					PingTimeout:  int(timeout / time.Millisecond),
+				})
 				go func() {
 					so := ß.Socket
 					defer so.Close()
@@ -61,7 +68,6 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 func (s *Server) Close() (err error) {
 	s.once.Do(func() {
 		close(s.done)
-		close(s.ßchan)
 	})
 	return
 }
@@ -81,26 +87,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ß *session
-	sid := query.Get(querySession)
-	if sid == "" {
+	if sid := query.Get(querySession); sid == "" {
 		conn, err := acceptor.Accept(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		ß = s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
-		ß.transport = acceptor.Transport()
-		ß.Emit(EventOpen, MessageTypeString, &Parameters{
-			SID:          ß.id,
-			Upgrades:     []string{"websocket"},
-			PingInterval: int(s.pingInterval / time.Millisecond),
-			PingTimeout:  int(s.pingTimeout / time.Millisecond),
-		})
-		s.ßchan <- ß
+		ß := s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
+		ß.Socket.transport = acceptor.Transport()
+		select {
+		case <-s.done:
+			return
+		case s.ßchan <- ß:
+		}
+		ß.ServeHTTP(w, r)
 	} else {
-		var exists bool
-		ß, exists = s.sessionManager.Get(sid)
+		ß, exists := s.sessionManager.Get(sid)
 		if !exists {
 			http.Error(w, "invalid session", http.StatusBadRequest)
 			return
@@ -114,15 +116,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			ß.upgrade(transport, conn)
 		}
+		ß.ServeHTTP(w, r)
 	}
-	ß.ServeHTTP(w, r)
 	return
-}
-
-func (s *Server) BindAndListen(srv *http.Server) error {
-	if srv == nil {
-		panic("nil http server")
-	}
-	srv.Handler = s
-	return srv.ListenAndServe()
 }
