@@ -9,6 +9,12 @@ import (
 )
 
 func ExampleServer() {
+	server := newServer()
+	defer server.Close()
+	http.ListenAndServe(":8081", server)
+}
+
+func newServer() *socketio.Server {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
 		so.On("message", func(data string) {
@@ -40,5 +46,5 @@ func ExampleServer() {
 		}()
 		return so.Emit("event", "hello world!")
 	})
-	http.ListenAndServe(":8081", server)
+	return server
 }

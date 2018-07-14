@@ -20,6 +20,12 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
+	server := newServer()
+	defer server.Close()
+	http.ListenAndServe(":8081", server)
+}
+
+func newServer() *engine.Server {
 	server, _ := engine.NewServer(time.Second*5, time.Second*5, func(so *engine.Socket) {
 		so.On(engine.EventMessage, engine.Callback(func(typ engine.MessageType, data []byte) {
 			switch typ {
@@ -32,7 +38,7 @@ func ExampleServer() {
 			}
 		}))
 		so.On(engine.EventPing, engine.Callback(func(_ engine.MessageType, _ []byte) {
-			fmt.Fprintf(os.Stderr, "recv ping\n")
+			fmt.Fprintf(os.Stderr, "socket ping\n")
 		}))
 		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			fmt.Fprintf(os.Stderr, "socket close\n")
@@ -41,5 +47,5 @@ func ExampleServer() {
 			fmt.Fprintf(os.Stderr, "socket upgrade\n")
 		}))
 	})
-	http.ListenAndServe(":8081", server)
+	return server
 }

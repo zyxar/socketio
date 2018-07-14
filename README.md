@@ -136,7 +136,7 @@ Client:
 
 ## Parser
 
-The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with version 3 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
+The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with revision 4 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
 
 An `Event` or `Ack` Packet with any data satisfying `socketio.Buffer` interface would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
 
