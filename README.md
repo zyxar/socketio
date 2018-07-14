@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/zyxar/socketio?status.svg)](https://godoc.org/github.com/zyxar/socketio)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyxar/socketio)](https://goreportcard.com/report/github.com/zyxar/socketio)
-
+[![license](https://img.shields.io/badge/license-New%20BSD-red.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
 
 [socket.io](https://socket.io/)/[engine.io](https://github.com/socketio/engine.io) in #Go
 
@@ -10,7 +10,7 @@
 ## Install
 
 ```shell
-go get -v -u github.com/zyxar/socketio
+vgo get -v -u github.com/zyxar/socketio
 ```
 
 ## Example
@@ -31,7 +31,7 @@ func main() {
 	server, _ := socketio.NewServer(time.Second*25, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
 		so.On("message", func(data string) {
- 			log.Println(data)
+			log.Println(data)
 		})
 		so.OnError(func(err error) {
 			log.Println("socket error:", err)
@@ -48,20 +48,20 @@ const socket = io('http://localhost:8081');
 var id;
 
 socket.on('connect', function() {
-    console.log('connected');
-    if (id === undefined) {
-        id = setInterval(function() {
-            socket.emit('message', 'hello there!')
-        }, 2000);
-    }
+  console.log('connected');
+  if (id === undefined) {
+    id = setInterval(function() {
+      socket.emit('message', 'hello there!')
+    }, 2000);
+  }
 });
 socket.on('event', console.log);
 socket.on('disconnect', function() {
-    console.log('disconnected');
-    if (id) {
-        clearInterval(id);
-        id = undefined;
-    }
+  console.log('disconnected');
+  if (id) {
+    clearInterval(id);
+    id = undefined;
+  }
 });
 ```
 
@@ -71,11 +71,9 @@ socket.on('disconnect', function() {
 
 Server:
 ```go
-  so.On("message", func(data string) {
-    so.Emit("ack", "foo", func(msg string) {
-      log.Println(msg)
-    })
-  })
+	so.Emit("ack", "foo", func(msg string) {
+		log.Println(msg)
+	})
 ```
 Client:
 ```js
@@ -89,10 +87,10 @@ Client:
 
 Server:
 ```go
-  so.On("foobar", func(data string) (string, string) {
-    log.Println("foobar:", data)
-    return "foo", "bar"
-  })
+	so.On("foobar", func(data string) (string, string) {
+		log.Println("foobar:", data)
+		return "foo", "bar"
+	})
 ```
 
 Client:
@@ -106,21 +104,21 @@ Client:
 
 Server:
 ```go
-  so.On("binary", func(data interface{}, b *socketio.Binary) {
-    log.Println(data)
-    log.Printf("%x", b.Bytes())
-  })
-  go func() {
-    b := &socketio.Binary{}
-    for {
-      select {
-      case <-time.After(time.Second * 2):
-        t, _ := time.Now().MarshalBinary()
-        b.Attach(t)
-        so.Emit("event", "check it out!", b)
-      }
-    }
-  }()
+	so.On("binary", func(data interface{}, b *socketio.Binary) {
+		log.Println(data)
+		log.Printf("%x", b.Bytes())
+	})
+	go func() {
+		b := &socketio.Binary{}
+		for {
+			select {
+			case <-time.After(time.Second * 2):
+				t, _ := time.Now().MarshalBinary()
+				b.Attach(t)
+				so.Emit("event", "check it out!", b)
+			}
+		}
+	}()
 ```
 
 Client:
@@ -135,6 +133,14 @@ Client:
 
   socket.on('event', console.log);
 ```
+
+## Parser
+
+The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with version 3 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
+
+An `Event` or `Ack` Packet with any data satisfying `socketio.Buffer` interface would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
+
+It is possible to use a customized `Parser` in server as long as it's compatible with client side.
 
 ## TODOs
 
