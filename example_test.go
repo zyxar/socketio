@@ -12,7 +12,8 @@ func ExampleServer() {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
 		so.On("message", func(data string) {
-			so.Emit("ack", "woot", func(msg string) {
+			so.Emit("ack", "woot", func(msg string, b *socketio.Binary) {
+				log.Printf("%s=> %x", msg, b.Bytes())
 			})
 		})
 		so.On("binary", func(data interface{}, b *socketio.Binary) {

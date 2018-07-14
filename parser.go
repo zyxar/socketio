@@ -250,7 +250,16 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 		}
 		return p, nil
 	} else if p.Type == PacketTypeAck || p.Type == PacketTypeBinaryAck {
-		p.event = &eventArgs{data: s[i:]}
+		text := s[i:]
+		if s[i] == '[' {
+			if p.Type == PacketTypeBinaryAck {
+				p.buffer, text = extractAttachments(text)
+				if len(p.buffer) != p.attachments {
+					return nil, ErrUnknownPacket
+				}
+			}
+		}
+		p.event = &eventArgs{data: text}
 		return p, nil
 	}
 
