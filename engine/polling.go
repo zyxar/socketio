@@ -243,8 +243,11 @@ func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	}
 	s := buf.String()
 	buf.Reset()
-	json.NewEncoder(&buf).Encode(s)
-	_, err := fmt.Fprintf(w, `___eio[%s]("%s");`, jsonp, buf.String())
+	err := json.NewEncoder(&buf).Encode(s)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, `___eio[%s]("%s");`, jsonp, buf.String())
 	return err
 }
 
