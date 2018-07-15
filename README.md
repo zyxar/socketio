@@ -104,17 +104,17 @@ Client:
 
 Server:
 ```go
-	so.On("binary", func(data interface{}, b *socketio.Binary) {
+	so.On("binary", func(data interface{}, b *socketio.Bytes) {
 		log.Println(data)
-		log.Printf("%x", b.Bytes())
+		log.Printf("%x", b.Marshal())
 	})
 	go func() {
-		b := &socketio.Binary{}
+		b := &socketio.Bytes{}
 		for {
 			select {
 			case <-time.After(time.Second * 2):
 				t, _ := time.Now().MarshalBinary()
-				b.Attach(t)
+				b.Unmarshal(t)
 				so.Emit("event", "check it out!", b)
 			}
 		}
@@ -138,9 +138,7 @@ Client:
 
 The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with revision 4 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
 
-An `Event` or `Ack` Packet with any data satisfying `socketio.Buffer` interface would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
-
-It is possible to use a customized `Parser` in server as long as it's compatible with client side.
+An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
 
 ## TODOs
 

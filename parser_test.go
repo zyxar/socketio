@@ -120,10 +120,10 @@ func TestParserEncodeBinary(t *testing.T) {
 	encoder := DefaultParser.Encoder()
 	b := [][]byte{{1, 2, 3, 4}, {2, 3, 4, 6}, {4, 5, 6, 8}}
 	p := &Packet{Type: PacketTypeBinaryEvent, Namespace: "/", Data: []interface{}{"message",
-		&Binary{data: b[0]},
-		&Binary{data: b[1]},
+		&Bytes{data: b[0]},
+		&Bytes{data: b[1]},
 		"TEXT",
-		&Binary{data: b[2]},
+		&Bytes{data: b[2]},
 	}, ID: newid(1)}
 	encodedString := `53-1["message",{"_placeholder":true,"num":0},{"_placeholder":true,"num":1},"TEXT",{"_placeholder":true,"num":2}]
 `

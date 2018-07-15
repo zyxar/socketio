@@ -37,9 +37,9 @@ func (e *handleFn) Call(data []byte, buffer [][]byte) ([]reflect.Value, error) {
 		}
 		in[i] = reflect.New(typ)
 		it := in[i].Interface()
-		if b, ok := it.(Buffer); ok {
+		if b, ok := it.(Binary); ok {
 			if len(buffer) > 0 {
-				b.Attach(buffer[0])
+				b.Unmarshal(buffer[0])
 				buffer = buffer[1:]
 			}
 		} else {

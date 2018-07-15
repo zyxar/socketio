@@ -68,10 +68,10 @@ func (p *Packet) preprocess() {
 	if d, ok := p.Data.([]interface{}); ok {
 		p.buffer = make([][]byte, 1, len(d)+1)
 		for i := range d {
-			if b, ok := d[i].(Buffer); ok {
-				b.SetNum(p.attachments)
+			if b, ok := d[i].(Binary); ok {
+				d[i] = &binaryWrap{b, p.attachments}
 				p.attachments++
-				p.buffer = append(p.buffer, b.Bytes())
+				p.buffer = append(p.buffer, b.Marshal())
 			}
 		}
 	}
@@ -297,19 +297,17 @@ const MessageTypeBinary MessageType = engine.MessageTypeBinary
 var placeholderExp = regexp.MustCompile(`\s*,\s*\{\s*"_placeholder"\s*:\s*true\s*,\s*"num"\s*:\s*\d*?\s*\}\s*`)
 var eventExp = regexp.MustCompile(`^\[\s*"(?P<event>[^"]+)"\s*,?`)
 
-type Buffer interface {
-	json.Marshaler
-	Bytes() []byte
-	Attach([]byte)
-	SetNum(i int)
+type Binary interface {
+	Marshal() []byte
+	Unmarshal([]byte)
 }
 
-type Binary struct {
-	data []byte
-	num  int
+type binaryWrap struct {
+	Binary
+	num int
 }
 
-func (b Binary) MarshalJSON() ([]byte, error) {
+func (b binaryWrap) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	if _, err := fmt.Fprintf(&buf, `{"_placeholder":true,"num":%d}`, b.num); err != nil {
 		return nil, err
@@ -317,14 +315,14 @@ func (b Binary) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (b *Binary) Bytes() []byte {
+type Bytes struct {
+	data []byte
+}
+
+func (b *Bytes) Marshal() []byte {
 	return b.data[:]
 }
 
-func (b *Binary) Attach(p []byte) {
+func (b *Bytes) Unmarshal(p []byte) {
 	b.data = p
-}
-
-func (b *Binary) SetNum(i int) {
-	b.num = i
 }

@@ -11,20 +11,19 @@ import (
 func ExampleServer() {
 	server := newServer()
 	defer server.Close()
-	http.ListenAndServe(":8081", server)
+	http.ListenAndServe("localhost:8081", server)
 }
 
 func newServer() *socketio.Server {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
 		so.On("message", func(data string) {
-			so.Emit("ack", "woot", func(msg string, b *socketio.Binary) {
-				log.Printf("%s=> %x", msg, b.Bytes())
+			so.Emit("ack", "woot", func(msg string, b *socketio.Bytes) {
+				log.Printf("%s=> %x", msg, b.Marshal())
 			})
 		})
-		so.On("binary", func(data interface{}, b *socketio.Binary) {
-			log.Println(data)
-			log.Printf("%x", b.Bytes())
+		so.On("binary", func(data interface{}, b socketio.Bytes) {
+			log.Printf("%s <- %x", data, b.Marshal())
 		})
 		so.On("foobar", func(data string) (string, string) {
 			log.Println("foobar:", data)
@@ -34,12 +33,12 @@ func newServer() *socketio.Server {
 			log.Println("socket error:", err)
 		})
 		go func() {
-			b := &socketio.Binary{}
+			b := &socketio.Bytes{}
 			for {
 				select {
 				case <-time.After(time.Second * 2):
 					t, _ := time.Now().MarshalBinary()
-					b.Attach(t)
+					b.Unmarshal(t)
 					so.Emit("event", "check it out!", b)
 				}
 			}
