@@ -10,12 +10,12 @@ import (
 type Socket struct {
 	Conn
 	*eventHandlers
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	transport    string
-	barrier      atomic.Value
-	emitter      *emitter
-	once         sync.Once
+	readTimeout   time.Duration
+	writeTimeout  time.Duration
+	transportName string
+	barrier       atomic.Value
+	emitter       *emitter
+	once          sync.Once
 	sync.RWMutex
 }
 
@@ -48,7 +48,7 @@ func (s *Socket) resume() {
 	close(s.barrier.Load().(chan struct{}))
 }
 
-func (s *Socket) upgrade(transport string, newConn Conn) {
+func (s *Socket) upgrade(transportName string, newConn Conn) {
 	s.pause()
 	defer s.resume()
 	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
@@ -100,7 +100,7 @@ func (s *Socket) upgrade(transport string, newConn Conn) {
 
 	s.Lock()
 	s.Conn = newConn
-	s.transport = transport
+	s.transportName = transportName
 	s.Unlock()
 	s.fire(EventUpgrade, p.msgType, p.data)
 	return

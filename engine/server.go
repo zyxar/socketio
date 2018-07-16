@@ -81,20 +81,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acceptor := getAcceptor(query.Get(queryTransport))
-	if acceptor == nil {
+	transport := getTransport(query.Get(queryTransport))
+	if transport == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return
 	}
 
 	if sid := query.Get(querySession); sid == "" {
-		conn, err := acceptor.Accept(w, r)
+		conn, err := transport.Accept(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		ß := s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
-		ß.Socket.transport = acceptor.Transport()
+		ß.Socket.transportName = transport.Name()
 		select {
 		case <-s.done:
 			return
@@ -107,14 +107,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid session", http.StatusBadRequest)
 			return
 		}
-		transport := acceptor.Transport()
-		if ß.transport != transport {
-			conn, err := acceptor.Accept(w, r)
+		if transportName := transport.Name(); ß.transportName != transportName {
+			conn, err := transport.Accept(w, r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			ß.upgrade(transport, conn)
+			ß.upgrade(transportName, conn)
 		}
 		ß.ServeHTTP(w, r)
 	}

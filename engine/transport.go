@@ -13,6 +13,7 @@ import (
 type Transport interface {
 	Dialer
 	Acceptor
+	Name() string
 }
 
 type Dialer interface {
@@ -21,7 +22,6 @@ type Dialer interface {
 
 type Acceptor interface {
 	Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error)
-	Transport() string
 }
 
 type Conn interface {
@@ -40,6 +40,7 @@ func getTransport(name string) Transport {
 	case transportWebsocket:
 		return WebsocketTransport
 	case transportPolling:
+		return PollingTransport
 	}
 	return nil
 }
@@ -89,7 +90,7 @@ type websocketTransport struct {
 	WriteBufferSize int
 }
 
-func (websocketTransport) Transport() string {
+func (websocketTransport) Name() string {
 	return transportWebsocket
 }
 
@@ -123,8 +124,7 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 
 // polling
 
-type pollingAcceptor struct {
-}
+type pollingAcceptor struct{}
 
 func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
 	return NewPollingConn(8), nil
@@ -132,6 +132,14 @@ func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn C
 
 var PollingAcceptor Acceptor = &pollingAcceptor{}
 
-func (pollingAcceptor) Transport() string {
+type pollingTransport struct{ *pollingAcceptor }
+
+func (pollingTransport) Name() string {
 	return transportPolling
 }
+
+func (pollingTransport) Dial(rawurl string, requestHeader http.Header) (Conn, error) {
+	return nil, errors.New("not implemented")
+}
+
+var PollingTransport Transport = &pollingTransport{&pollingAcceptor{}}
