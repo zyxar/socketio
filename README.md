@@ -142,8 +142,8 @@ An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface 
 
 ## TODOs
 
-- [ ] engine.io polling client
-- [ ] socket.io client
-- [ ] Room
+- [x] socket.io client
 - [ ] `namespace`
+- [ ] Room
 - [ ] Broadcasting
+- [ ] engine.io polling client

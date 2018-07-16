@@ -109,6 +109,7 @@ func (s *Socket) fire(event string, args []byte, buffer [][]byte) ([]reflect.Val
 func (s *Socket) process(p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
+		s.fire("connect", nil, nil) // client
 	case PacketTypeDisconnect:
 		s.Close()
 	case PacketTypeEvent, PacketTypeBinaryEvent:

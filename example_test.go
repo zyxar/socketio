@@ -6,7 +6,35 @@ import (
 	"time"
 
 	"github.com/zyxar/socketio"
+	"github.com/zyxar/socketio/engine"
 )
+
+func ExampleDial() {
+	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	defer c.Close()
+	c.On("event", func(message string, b socketio.Bytes) {
+		log.Printf("%s => %x", message, b.Marshal())
+	})
+	c.OnError(func(err error) {
+		log.Println(err.Error())
+	})
+	b := &socketio.Bytes{}
+	b.Unmarshal([]byte{1, 2, 3, 4, 5, 6})
+	c.Emit("binary", "bytes", b)
+
+	for {
+		select {
+		case <-time.After(time.Second * 2):
+		}
+		c.Emit("foobar", "foo", func(a, b string) {
+			log.Println("foobar =>", a, b)
+		})
+	}
+}
 
 func ExampleServer() {
 	server := newServer()
