@@ -323,13 +323,13 @@ func (b binaryWrap) MarshalJSON() ([]byte, error) {
 }
 
 type Bytes struct {
-	data []byte
+	Data []byte
 }
 
 func (b *Bytes) Marshal() []byte {
-	return b.data[:]
+	return b.Data[:]
 }
 
 func (b *Bytes) Unmarshal(p []byte) {
-	b.data = p
+	b.Data = p
 }

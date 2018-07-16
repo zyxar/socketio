@@ -22,9 +22,7 @@ func ExampleDial() {
 	c.OnError(func(err error) {
 		log.Println(err.Error())
 	})
-	b := &socketio.Bytes{}
-	b.Unmarshal([]byte{1, 2, 3, 4, 5, 6})
-	c.Emit("binary", "bytes", b)
+	c.Emit("binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
 
 	for {
 		select {
