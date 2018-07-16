@@ -16,12 +16,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	if err != nil {
 		return
 	}
-	socket := &Socket{
-		so:       e.Socket,
-		encoder:  parser.Encoder(),
-		decoder:  parser.Decoder(),
-		handlers: make(map[string]*handleFn)}
-
+	socket := newClientSocket(e.Socket, parser)
 	e.Socket.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
