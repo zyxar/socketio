@@ -13,26 +13,46 @@ type Socket struct {
 	decoder Decoder
 
 	onError func(err error)
+	nspCtor func(nsp string) *Namespace
 
 	nsp   map[string]*Namespace
 	mutex sync.RWMutex
 }
 
-func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
+func newServerSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 	encoder := parser.Encoder()
 	decoder := parser.Decoder()
-	b, _ := encoder.Encode(&Packet{
-		Type:      PacketTypeConnect,
-		Namespace: "/",
-	})
-	if err := so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
+	nspOnConnect := func(nsp string) error {
+		b, _ := encoder.Encode(&Packet{
+			Type:      PacketTypeConnect,
+			Namespace: nsp,
+		})
+		return so.Emit(engine.EventMessage, MessageTypeString, b[0])
+	}
+	if err := nspOnConnect("/"); err != nil {
 		return nil, err
 	}
-	return &Socket{
+	socket := &Socket{
 		so:      so,
 		encoder: encoder,
 		decoder: decoder,
-		nsp:     make(map[string]*Namespace)}, nil
+		nsp:     map[string]*Namespace{"/": newNamespace("/")},
+		nspCtor: func(nsp string) *Namespace {
+			nspOnConnect(nsp)
+			return newNamespace(nsp)
+		},
+	}
+	return socket, nil
+}
+
+func newClientSocket(so *engine.Socket, parser Parser) *Socket {
+	return &Socket{
+		so:      so,
+		encoder: parser.Encoder(),
+		decoder: parser.Decoder(),
+		nsp:     make(map[string]*Namespace),
+		nspCtor: newNamespace,
+	}
 }
 
 func (s *Socket) namespace(nsp string) *Namespace {
@@ -43,7 +63,7 @@ func (s *Socket) namespace(nsp string) *Namespace {
 	n, ok := s.nsp[nsp]
 	s.mutex.RUnlock()
 	if !ok {
-		n = newNamespace(nsp)
+		n = s.nspCtor(nsp)
 		s.mutex.Lock()
 		s.nsp[nsp] = n
 		s.mutex.Unlock()
@@ -107,7 +127,9 @@ func (s *Socket) process(p *Packet) {
 	case PacketTypeConnect:
 		s.fire(p.Namespace, "connect", nil, nil) // client
 	case PacketTypeDisconnect:
-		s.Close()
+		s.mutex.Lock()
+		delete(s.nsp, p.Namespace)
+		s.mutex.Unlock()
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
 			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)

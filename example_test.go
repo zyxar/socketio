@@ -51,6 +51,9 @@ func newServer() *socketio.Server {
 		so.On("/", "binary", func(data interface{}, b socketio.Bytes) {
 			log.Printf("%s <- %x", data, b.Marshal())
 		})
+		so.On("/ditto", "disguise", func(msg interface{}, b socketio.Bytes) {
+			log.Printf("%v: %x", msg, b.Marshal())
+		})
 		so.On("/", "foobar", func(data string) (string, string) {
 			log.Println("foobar:", data)
 			return "foo", "bar"
