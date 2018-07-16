@@ -30,13 +30,13 @@ import (
 func main() {
 	server, _ := socketio.NewServer(time.Second*25, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
-		so.On("message", func(data string) {
+		so.On("/", "message", func(data string) {
 			log.Println(data)
 		})
 		so.OnError(func(err error) {
 			log.Println("socket error:", err)
 		})
-		return so.Emit("event", "hello world!")
+		return so.Emit("/", "event", "hello world!")
 	})
 	http.ListenAndServe(":8081", server)
 }
@@ -71,7 +71,7 @@ socket.on('disconnect', function() {
 
 Server:
 ```go
-	so.Emit("ack", "foo", func(msg string) {
+	so.Emit("/", "ack", "foo", func(msg string) {
 		log.Println(msg)
 	})
 ```
@@ -87,7 +87,7 @@ Client:
 
 Server:
 ```go
-	so.On("foobar", func(data string) (string, string) {
+	so.On("/", "foobar", func(data string) (string, string) {
 		log.Println("foobar:", data)
 		return "foo", "bar"
 	})
@@ -104,7 +104,7 @@ Client:
 
 Server:
 ```go
-	so.On("binary", func(data interface{}, b *socketio.Bytes) {
+	so.On("/", "binary", func(data interface{}, b *socketio.Bytes) {
 		log.Println(data)
 		log.Printf("%x", b.Marshal())
 	})
@@ -115,7 +115,7 @@ Server:
 			case <-time.After(time.Second * 2):
 				t, _ := time.Now().MarshalBinary()
 				b.Unmarshal(t)
-				so.Emit("event", "check it out!", b)
+				so.Emit("/", "event", "check it out!", b)
 			}
 		}
 	}()
@@ -134,16 +134,31 @@ Client:
   socket.on('event', console.log);
 ```
 
+### Customized Namespace
+
+Server:
+```go
+	so.On("/ditto", "disguise", func(msg interface{}, b socketio.Bytes) {
+		log.Printf("%v: %x", msg, b.Marshal())
+	})
+```
+
+Client:
+```js
+let ditto = io('http://localhost:8081/ditto');
+ditto.emit('disguise', 'pidgey', new ArrayBuffer(8));
+```
+
 ## Parser
 
 The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with revision 4 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
 
-An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
+An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface (e.g. `socketio.Bytes`) would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
 
 ## TODOs
 
 - [x] socket.io client
-- [ ] `namespace`
+- [x] `namespace`
 - [ ] Room
 - [ ] Broadcasting
 - [ ] engine.io polling client
