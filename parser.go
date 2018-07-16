@@ -178,12 +178,19 @@ func (d *defaultDecoder) emit() {
 }
 
 func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
+	if len(s) < 1 {
+		return nil, ErrUnknownPacket
+	}
 	b := PacketType(s[0] - '0')
 	if b > PacketTypeBinaryAck {
 		return nil, ErrUnknownPacket
 	}
 	p = &Packet{Type: b}
 	i := 1 // skip 1st byte
+
+	if i >= len(s) {
+		return p, nil
+	}
 
 	if p.Type == PacketTypeBinaryEvent || p.Type == PacketTypeBinaryAck {
 		j := i
