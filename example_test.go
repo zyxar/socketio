@@ -16,19 +16,19 @@ func ExampleDial() {
 		return
 	}
 	defer c.Close()
-	c.On("event", func(message string, b socketio.Bytes) {
+	c.On("/", "event", func(message string, b socketio.Bytes) {
 		log.Printf("%s => %x", message, b.Marshal())
 	})
 	c.OnError(func(err error) {
 		log.Println(err.Error())
 	})
-	c.Emit("binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
+	c.Emit("/", "binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
 
 	for {
 		select {
 		case <-time.After(time.Second * 2):
 		}
-		c.Emit("foobar", "foo", func(a, b string) {
+		c.Emit("/", "foobar", "foo", func(a, b string) {
 			log.Println("foobar =>", a, b)
 		})
 	}
@@ -43,15 +43,15 @@ func ExampleServer() {
 func newServer() *socketio.Server {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so *socketio.Socket) error {
-		so.On("message", func(data string) {
-			so.Emit("ack", "woot", func(msg string, b *socketio.Bytes) {
+		so.On("/", "message", func(data string) {
+			so.Emit("/", "ack", "woot", func(msg string, b *socketio.Bytes) {
 				log.Printf("%s=> %x", msg, b.Marshal())
 			})
 		})
-		so.On("binary", func(data interface{}, b socketio.Bytes) {
+		so.On("/", "binary", func(data interface{}, b socketio.Bytes) {
 			log.Printf("%s <- %x", data, b.Marshal())
 		})
-		so.On("foobar", func(data string) (string, string) {
+		so.On("/", "foobar", func(data string) (string, string) {
 			log.Println("foobar:", data)
 			return "foo", "bar"
 		})
@@ -65,11 +65,11 @@ func newServer() *socketio.Server {
 				case <-time.After(time.Second * 2):
 					t, _ := time.Now().MarshalBinary()
 					b.Unmarshal(t)
-					so.Emit("event", "check it out!", b)
+					so.Emit("/", "event", "check it out!", b)
 				}
 			}
 		}()
-		return so.Emit("event", "hello world!")
+		return so.Emit("/", "event", "hello world!")
 	})
 	return server
 }

@@ -17,10 +17,10 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		return
 	}
 	socket := &Socket{
-		so:       e.Socket,
-		encoder:  parser.Encoder(),
-		decoder:  parser.Decoder(),
-		handlers: make(map[string]*handleFn)}
+		so:      e.Socket,
+		encoder: parser.Encoder(),
+		decoder: parser.Decoder(),
+		nsp:     make(map[string]*Namespace)}
 
 	e.Socket.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
 		switch msgType {

@@ -3,7 +3,6 @@ package socketio
 import (
 	"reflect"
 	"sync"
-	"sync/atomic"
 
 	"github.com/zyxar/socketio/engine"
 )
@@ -13,12 +12,10 @@ type Socket struct {
 	encoder Encoder
 	decoder Decoder
 
-	id     uint64
-	ackmap sync.Map
+	onError func(err error)
 
-	handlers map[string]*handleFn
-	onError  func(err error)
-	mutex    sync.RWMutex
+	nsp   map[string]*Namespace
+	mutex sync.RWMutex
 }
 
 func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
@@ -32,23 +29,37 @@ func newSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 		return nil, err
 	}
 	return &Socket{
-		so:       so,
-		encoder:  encoder,
-		decoder:  decoder,
-		handlers: make(map[string]*handleFn)}, nil
+		so:      so,
+		encoder: encoder,
+		decoder: decoder,
+		nsp:     make(map[string]*Namespace)}, nil
 }
 
-func (s *Socket) Emit(event string, args ...interface{}) (err error) {
+func (s *Socket) namespace(nsp string) *Namespace {
+	if nsp == "" {
+		nsp = "/"
+	}
+	s.mutex.RLock()
+	n, ok := s.nsp[nsp]
+	s.mutex.RUnlock()
+	if !ok {
+		n = newNamespace(nsp)
+		s.mutex.Lock()
+		s.nsp[nsp] = n
+		s.mutex.Unlock()
+	}
+	return n
+}
+
+func (s *Socket) Emit(nsp string, event string, args ...interface{}) (err error) {
 	data := []interface{}{event}
 	p := &Packet{
 		Type:      PacketTypeEvent,
-		Namespace: "/",
+		Namespace: nsp,
 	}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
-			id := s.genid()
-			s.ackmap.Store(id, newHandleFn(args[i]))
-			p.ID = newid(id)
+			p.ID = newid(s.namespace(nsp).store(args[i]))
 		} else {
 			data = append(data, args[i])
 		}
@@ -83,38 +94,23 @@ func (s *Socket) ack(p *Packet) (err error) {
 	return
 }
 
-func (s *Socket) onAck(id uint64, data []byte, buffer [][]byte) {
-	if fn, ok := s.ackmap.Load(id); ok {
-		s.ackmap.Delete(id)
-		fn.(*handleFn).Call(data, buffer)
-	}
+func (s *Socket) On(nsp string, event string, callback interface{}) {
+	s.namespace(nsp).On(event, callback)
 }
 
-func (s *Socket) On(event string, callback interface{}) {
-	s.mutex.Lock()
-	s.handlers[event] = newHandleFn(callback)
-	s.mutex.Unlock()
-}
-
-func (s *Socket) fire(event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
-	s.mutex.RLock()
-	fn, ok := s.handlers[event]
-	s.mutex.RUnlock()
-	if ok {
-		return fn.Call(args, buffer)
-	}
-	return nil, nil
+func (s *Socket) fire(nsp string, event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
+	return s.namespace(nsp).fire(event, args, buffer)
 }
 
 func (s *Socket) process(p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
-		s.fire("connect", nil, nil) // client
+		s.fire(p.Namespace, "connect", nil, nil) // client
 	case PacketTypeDisconnect:
 		s.Close()
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := s.fire(p.event.name, p.event.data, p.buffer)
+			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
 			if err != nil {
 				if s.onError != nil {
 					s.onError(err)
@@ -139,7 +135,7 @@ func (s *Socket) process(p *Packet) {
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			s.onAck(*p.ID, p.event.data, p.buffer)
+			s.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
 	default:
@@ -160,10 +156,6 @@ func (s *Socket) yield() *Packet {
 
 func (s *Socket) Close() (err error) {
 	return s.so.Close()
-}
-
-func (s *Socket) genid() uint64 {
-	return atomic.AddUint64(&s.id, 1)
 }
 
 func (s *Socket) OnError(fn func(err error)) {
