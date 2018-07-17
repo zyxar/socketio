@@ -1,58 +1,62 @@
 package socketio
 
 import (
-	"encoding/json"
-	"errors"
 	"reflect"
+	"sync"
+	"sync/atomic"
 )
 
-var (
-	errInvalidHandleFunc = errors.New("invalid handle function")
-)
-
-type handleFn struct {
-	fn   reflect.Value
-	args []reflect.Type
+type Namespace struct {
+	name string
+	eventHandle
+	ackHandle
 }
 
-func newHandleFn(fn interface{}) *handleFn {
-	v := reflect.ValueOf(fn)
-	if v.Kind() != reflect.Func {
-		panic(errInvalidHandleFunc)
+func newNamespace(namespace string) *Namespace {
+	return &Namespace{
+		name: namespace,
+		eventHandle: eventHandle{
+			handlers: make(map[string]*handleFn),
+		},
+		ackHandle: ackHandle{},
 	}
-	t := v.Type()
-	args := make([]reflect.Type, t.NumIn())
-	for i := 0; i < t.NumIn(); i++ {
-		args[i] = t.In(i)
-	}
-	return &handleFn{fn: v, args: args}
 }
 
-func (e *handleFn) Call(data []byte, buffer [][]byte) ([]reflect.Value, error) {
-	args := make([]interface{}, 0, len(e.args))
-	in := make([]reflect.Value, len(e.args))
-	for i, typ := range e.args {
-		if typ.Kind() == reflect.Ptr {
-			typ = typ.Elem()
-		}
-		in[i] = reflect.New(typ)
-		it := in[i].Interface()
-		if b, ok := it.(Binary); ok {
-			if len(buffer) > 0 {
-				b.Unmarshal(buffer[0])
-				buffer = buffer[1:]
-			}
-		} else {
-			args = append(args, it)
-		}
+type eventHandle struct {
+	handlers map[string]*handleFn
+	mutex    sync.RWMutex
+}
+
+func (e *eventHandle) On(event string, callback interface{}) {
+	e.mutex.Lock()
+	e.handlers[event] = newHandleFn(callback)
+	e.mutex.Unlock()
+}
+
+func (e *eventHandle) fire(event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
+	e.mutex.RLock()
+	fn, ok := e.handlers[event]
+	e.mutex.RUnlock()
+	if ok {
+		return fn.Call(args, buffer)
 	}
-	if err := json.Unmarshal(data, &args); err != nil {
-		return nil, err
+	return nil, nil
+}
+
+type ackHandle struct {
+	id     uint64
+	ackmap sync.Map
+}
+
+func (a *ackHandle) onAck(id uint64, data []byte, buffer [][]byte) {
+	if fn, ok := a.ackmap.Load(id); ok {
+		a.ackmap.Delete(id)
+		fn.(*handleFn).Call(data, buffer)
 	}
-	for i := range e.args {
-		if e.args[i].Kind() != reflect.Ptr {
-			in[i] = in[i].Elem()
-		}
-	}
-	return e.fn.Call(in), nil
+}
+
+func (a *ackHandle) store(callback interface{}) uint64 {
+	id := atomic.AddUint64(&a.id, 1)
+	a.ackmap.Store(id, newHandleFn(callback))
+	return id
 }
