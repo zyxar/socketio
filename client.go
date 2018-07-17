@@ -58,6 +58,7 @@ func (c *Client) OnError(fn func(interface{})) {
 }
 
 func (c *Client) process(sock *socket, p *Packet) {
+	nsp := sock.namespace(p.Namespace)
 	switch p.Type {
 	case PacketTypeConnect:
 		if c.onConnect != nil {
@@ -69,7 +70,7 @@ func (c *Client) process(sock *socket, p *Packet) {
 		sock.mutex.Unlock()
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := sock.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
+			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)
 			if err != nil {
 				if c.onError != nil {
 					c.onError(err)
@@ -94,7 +95,7 @@ func (c *Client) process(sock *socket, p *Packet) {
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			sock.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
+			nsp.onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
 		if c.onError != nil {

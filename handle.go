@@ -6,15 +6,13 @@ import (
 	"sync/atomic"
 )
 
-type Namespace struct {
-	name string
+type nspHandle struct {
 	eventHandle
 	ackHandle
 }
 
-func newNamespace(namespace string) *Namespace {
-	return &Namespace{
-		name: namespace,
+func newNspHandle(namespace string) *nspHandle {
+	return &nspHandle{
 		eventHandle: eventHandle{
 			handlers: make(map[string]*handleFn),
 		},

@@ -18,10 +18,10 @@ type socket struct {
 	encoder Encoder
 	decoder Decoder
 
-	onError      func(nsp string, err interface{})
-	nspOnConnect func(nsp string) error
+	onError func(nsp string, err interface{})
 
-	nsp   map[string]*Namespace
+	nsp   map[string]*nspHandle
+	nspL  map[string]struct{}
 	mutex sync.RWMutex
 }
 
@@ -32,15 +32,11 @@ func newServerSocket(so *engine.Socket, parser Parser) *socket {
 		so:      so,
 		encoder: encoder,
 		decoder: decoder,
-		nsp:     make(map[string]*Namespace),
+		nsp:     make(map[string]*nspHandle),
+		nspL:    make(map[string]struct{}),
 	}
-	socket.nspOnConnect = func(nsp string) error {
-		return socket.emitPacket(&Packet{
-			Type:      PacketTypeConnect,
-			Namespace: nsp,
-		})
-	}
-	socket.namespace("/")
+
+	socket.attachnsp("/")
 	return socket
 }
 
@@ -49,11 +45,40 @@ func newClientSocket(so *engine.Socket, parser Parser) *socket {
 		so:      so,
 		encoder: parser.Encoder(),
 		decoder: parser.Decoder(),
-		nsp:     make(map[string]*Namespace),
+		nsp:     make(map[string]*nspHandle),
 	}
 }
 
-func (s *socket) namespace(nsp string) *Namespace {
+func (s *socket) attachnsp(nsp string) *nspHandle {
+	if nsp == "" {
+		nsp = "/"
+	}
+	s.mutex.RLock()
+	_, ok := s.nspL[nsp]
+	s.mutex.RUnlock()
+	if !ok {
+		if err := s.emitPacket(&Packet{
+			Type:      PacketTypeConnect,
+			Namespace: nsp,
+		}); err != nil {
+			if s.onError != nil {
+				s.onError(nsp, err)
+			}
+		}
+		s.mutex.Lock()
+		s.nspL[nsp] = struct{}{}
+		s.mutex.Unlock()
+	}
+	return s.namespace(nsp)
+}
+
+func (s *socket) detachnsp(nsp string) {
+	s.mutex.Lock()
+	delete(s.nspL, nsp)
+	s.mutex.Unlock()
+}
+
+func (s *socket) namespace(nsp string) *nspHandle {
 	if nsp == "" {
 		nsp = "/"
 	}
@@ -61,14 +86,7 @@ func (s *socket) namespace(nsp string) *Namespace {
 	n, ok := s.nsp[nsp]
 	s.mutex.RUnlock()
 	if !ok {
-		n = newNamespace(nsp)
-		if s.nspOnConnect != nil {
-			if err := s.nspOnConnect(nsp); err != nil {
-				if s.onError != nil {
-					s.onError(nsp, err)
-				}
-			}
-		}
+		n = newNspHandle(nsp)
 		s.mutex.Lock()
 		s.nsp[nsp] = n
 		s.mutex.Unlock()
@@ -116,10 +134,6 @@ func (s *socket) emitPacket(p *Packet) (err error) {
 
 func (s *socket) On(nsp string, event string, callback interface{}) {
 	s.namespace(nsp).On(event, callback)
-}
-
-func (s *socket) fire(nsp string, event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
-	return s.namespace(nsp).fire(event, args, buffer)
 }
 
 func (s *socket) yield() *Packet {

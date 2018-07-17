@@ -73,19 +73,18 @@ func (s *Server) OnError(fn func(so Socket, err error)) {
 	s.onError = fn
 }
 
-func (*Server) process(s *socket, p *Packet) {
+func (*Server) process(sock *socket, p *Packet) {
+	nsp := sock.attachnsp(p.Namespace)
 	switch p.Type {
 	case PacketTypeConnect:
 	case PacketTypeDisconnect:
-		s.mutex.Lock()
-		delete(s.nsp, p.Namespace)
-		s.mutex.Unlock()
+		sock.detachnsp(p.Namespace)
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
+			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)
 			if err != nil {
-				if s.onError != nil {
-					s.onError(p.Namespace, err)
+				if sock.onError != nil {
+					sock.onError(p.Namespace, err)
 				}
 				return
 			}
@@ -98,24 +97,24 @@ func (*Server) process(s *socket, p *Packet) {
 					}
 					p.Data = d
 				}
-				if err = s.ack(p); err != nil {
-					if s.onError != nil {
-						s.onError(p.Namespace, err)
+				if err = sock.ack(p); err != nil {
+					if sock.onError != nil {
+						sock.onError(p.Namespace, err)
 					}
 				}
 			}
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			s.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
+			nsp.onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
-		if s.onError != nil {
-			s.onError(p.Namespace, p.Data)
+		if sock.onError != nil {
+			sock.onError(p.Namespace, p.Data)
 		}
 	default:
-		if s.onError != nil {
-			s.onError(p.Namespace, ErrUnknownPacket)
+		if sock.onError != nil {
+			sock.onError(p.Namespace, ErrUnknownPacket)
 		}
 	}
 }
