@@ -134,6 +134,52 @@ Client:
   socket.on('event', console.log);
 ```
 
+#### Binary Helper for `protobuf`
+
+```go
+import (
+	"github.com/golang/protobuf/proto"
+)
+
+type ProtoMessage struct {
+	proto.Message
+}
+
+func (p ProtoMessage) Marshal() []byte {
+	b, _ := proto.Marshal(p.Message)
+	return b
+}
+
+func (p *ProtoMessage) Unmarshal(b []byte) {
+	proto.Unmarshal(b, p.Message)
+}
+```
+
+#### Binary Helper for `MessagePack`
+
+```go
+import (
+	"github.com/tinylib/msgp/msgp"
+)
+
+type MessagePack struct {
+	Message interface {
+		msgp.MarshalSizer
+		msgp.Unmarshaler
+	}
+}
+
+func (m MessagePack) Marshal() []byte {
+	b, _ := m.Message.MarshalMsg(nil)
+	return b
+}
+
+func (m *MessagePack) Unmarshal(b []byte) {
+	m.Message.UnmarshalMsg(b)
+}
+```
+
+
 ### Customized Namespace
 
 Server:
