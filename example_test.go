@@ -10,7 +10,10 @@ import (
 )
 
 func ExampleDial() {
-	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
+	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser,
+		func(socketio.Socket) {
+			log.Println("connected")
+		})
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -19,8 +22,8 @@ func ExampleDial() {
 	c.On("/", "event", func(message string, b socketio.Bytes) {
 		log.Printf("%s => %x", message, b.Marshal())
 	})
-	c.OnError(func(err error) {
-		log.Println(err.Error())
+	c.OnError(func(err interface{}) {
+		log.Println(err)
 	})
 	c.Emit("/", "binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
 
@@ -58,8 +61,8 @@ func newServer() *socketio.Server {
 			log.Println("foobar:", data)
 			return "foo", "bar"
 		})
-		so.OnError(func(err error) {
-			log.Println("socket error:", err)
+		so.OnError(func(nsp string, err interface{}) {
+			log.Printf("socket nsp=%q, error=%v", nsp, err)
 		})
 		go func() {
 			b := &socketio.Bytes{}

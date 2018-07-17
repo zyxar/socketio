@@ -10,7 +10,7 @@ import (
 type Socket interface {
 	Emit(nsp string, event string, args ...interface{}) (err error)
 	On(nsp string, event string, callback interface{})
-	OnError(fn func(err error))
+	OnError(fn func(nsp string, err interface{}))
 }
 
 type socket struct {
@@ -18,7 +18,7 @@ type socket struct {
 	encoder Encoder
 	decoder Decoder
 
-	onError      func(err error)
+	onError      func(nsp string, err interface{})
 	nspOnConnect func(nsp string) error
 
 	nsp   map[string]*Namespace
@@ -65,7 +65,7 @@ func (s *socket) namespace(nsp string) *Namespace {
 		if s.nspOnConnect != nil {
 			if err := s.nspOnConnect(nsp); err != nil {
 				if s.onError != nil {
-					s.onError(err)
+					s.onError(nsp, err)
 				}
 			}
 		}
@@ -135,6 +135,6 @@ func (s *socket) Close() (err error) {
 	return s.so.Close()
 }
 
-func (s *socket) OnError(fn func(err error)) {
+func (s *socket) OnError(fn func(nsp string, err interface{})) {
 	s.onError = fn
 }

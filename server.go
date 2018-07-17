@@ -22,8 +22,8 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 
 		if server.onConnect != nil {
 			if err = server.onConnect(socket); err != nil {
-				if socket.onError != nil {
-					socket.onError(err)
+				if server.onError != nil {
+					server.onError(socket, err)
 				}
 			}
 		}
@@ -36,8 +36,8 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 				return
 			}
 			if err := socket.decoder.Add(msgType, data); err != nil {
-				if socket.onError != nil {
-					socket.onError(err)
+				if server.onError != nil {
+					server.onError(socket, err)
 				}
 			}
 			if p := socket.yield(); p != nil {
@@ -85,7 +85,7 @@ func (*Server) process(s *socket, p *Packet) {
 			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
 			if err != nil {
 				if s.onError != nil {
-					s.onError(err)
+					s.onError(p.Namespace, err)
 				}
 				return
 			}
@@ -100,7 +100,7 @@ func (*Server) process(s *socket, p *Packet) {
 				}
 				if err = s.ack(p); err != nil {
 					if s.onError != nil {
-						s.onError(err)
+						s.onError(p.Namespace, err)
 					}
 				}
 			}
@@ -110,9 +110,12 @@ func (*Server) process(s *socket, p *Packet) {
 			s.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
+		if s.onError != nil {
+			s.onError(p.Namespace, p.Data)
+		}
 	default:
 		if s.onError != nil {
-			s.onError(ErrUnknownPacket)
+			s.onError(p.Namespace, ErrUnknownPacket)
 		}
 	}
 }

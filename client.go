@@ -9,9 +9,12 @@ import (
 type Client struct {
 	engine *engine.Client
 	Socket
+
+	onConnect func(Socket)
+	onError   func(err interface{})
 }
 
-func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (c *Client, err error) {
+func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(Socket)) (c *Client, err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
 		return
@@ -25,8 +28,8 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 			return
 		}
 		if err := socket.decoder.Add(msgType, data); err != nil {
-			if socket.onError != nil {
-				socket.onError(err)
+			if c.onError != nil {
+				c.onError(err)
 			}
 		}
 		if p := socket.yield(); p != nil {
@@ -38,7 +41,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		socket.Close()
 	}))
 
-	c = &Client{engine: e, Socket: socket}
+	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
 	return
 }
 
@@ -50,20 +53,26 @@ func (c *Client) Close() error {
 	return c.engine.Close()
 }
 
-func (*Client) process(s *socket, p *Packet) {
+func (c *Client) OnError(fn func(interface{})) {
+	c.onError = fn
+}
+
+func (c *Client) process(sock *socket, p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
-		s.fire(p.Namespace, "connect", nil, nil)
+		if c.onConnect != nil {
+			c.onConnect(sock)
+		}
 	case PacketTypeDisconnect:
-		s.mutex.Lock()
-		delete(s.nsp, p.Namespace)
-		s.mutex.Unlock()
+		sock.mutex.Lock()
+		delete(sock.nsp, p.Namespace)
+		sock.mutex.Unlock()
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
+			v, err := sock.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
 			if err != nil {
-				if s.onError != nil {
-					s.onError(err)
+				if c.onError != nil {
+					c.onError(err)
 				}
 				return
 			}
@@ -76,21 +85,24 @@ func (*Client) process(s *socket, p *Packet) {
 					}
 					p.Data = d
 				}
-				if err = s.ack(p); err != nil {
-					if s.onError != nil {
-						s.onError(err)
+				if err = sock.ack(p); err != nil {
+					if c.onError != nil {
+						c.onError(err)
 					}
 				}
 			}
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			s.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
+			sock.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
 		}
 	case PacketTypeError:
+		if c.onError != nil {
+			c.onError(p.Data)
+		}
 	default:
-		if s.onError != nil {
-			s.onError(ErrUnknownPacket)
+		if c.onError != nil {
+			c.onError(ErrUnknownPacket)
 		}
 	}
 }

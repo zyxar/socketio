@@ -33,8 +33,8 @@ func main() {
 		so.On("/", "message", func(data string) {
 			log.Println(data)
 		})
-		so.OnError(func(err error) {
-			log.Println("socket error:", err)
+		so.OnError(func(nsp string, err interface{}) {
+			log.Printf("socket nsp=%q, error=%v", nsp, err)
 		})
 		return so.Emit("/", "event", "hello world!")
 	})
