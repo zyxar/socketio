@@ -18,37 +18,30 @@ type socket struct {
 	encoder Encoder
 	decoder Decoder
 
-	onError func(err error)
-	nspCtor func(nsp string) *Namespace
+	onError      func(err error)
+	nspOnConnect func(nsp string) error
 
 	nsp   map[string]*Namespace
 	mutex sync.RWMutex
 }
 
-func newServerSocket(so *engine.Socket, parser Parser) (*socket, error) {
+func newServerSocket(so *engine.Socket, parser Parser) *socket {
 	encoder := parser.Encoder()
 	decoder := parser.Decoder()
-	nspOnConnect := func(nsp string) error {
-		b, _, _ := encoder.Encode(&Packet{
-			Type:      PacketTypeConnect,
-			Namespace: nsp,
-		})
-		return so.Emit(engine.EventMessage, MessageTypeString, b)
-	}
-	if err := nspOnConnect("/"); err != nil {
-		return nil, err
-	}
 	socket := &socket{
 		so:      so,
 		encoder: encoder,
 		decoder: decoder,
-		nsp:     map[string]*Namespace{"/": newNamespace("/")},
-		nspCtor: func(nsp string) *Namespace {
-			nspOnConnect(nsp)
-			return newNamespace(nsp)
-		},
+		nsp:     make(map[string]*Namespace),
 	}
-	return socket, nil
+	socket.nspOnConnect = func(nsp string) error {
+		return socket.emitPacket(&Packet{
+			Type:      PacketTypeConnect,
+			Namespace: nsp,
+		})
+	}
+	socket.namespace("/")
+	return socket
 }
 
 func newClientSocket(so *engine.Socket, parser Parser) *socket {
@@ -57,7 +50,6 @@ func newClientSocket(so *engine.Socket, parser Parser) *socket {
 		encoder: parser.Encoder(),
 		decoder: parser.Decoder(),
 		nsp:     make(map[string]*Namespace),
-		nspCtor: newNamespace,
 	}
 }
 
@@ -69,7 +61,14 @@ func (s *socket) namespace(nsp string) *Namespace {
 	n, ok := s.nsp[nsp]
 	s.mutex.RUnlock()
 	if !ok {
-		n = s.nspCtor(nsp)
+		n = newNamespace(nsp)
+		if s.nspOnConnect != nil {
+			if err := s.nspOnConnect(nsp); err != nil {
+				if s.onError != nil {
+					s.onError(err)
+				}
+			}
+		}
 		s.mutex.Lock()
 		s.nsp[nsp] = n
 		s.mutex.Unlock()

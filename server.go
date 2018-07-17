@@ -18,11 +18,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 	e, err := engine.NewServer(interval, timeout, func(so *engine.Socket) {
 		log.Println("socket open")
 
-		socket, err := newServerSocket(so, parser)
-		if err != nil {
-			log.Println("new socket:", err)
-			return
-		}
+		socket := newServerSocket(so, parser)
 
 		if server.onConnect != nil {
 			if err = server.onConnect(socket); err != nil {
