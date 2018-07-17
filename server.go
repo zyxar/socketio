@@ -10,8 +10,8 @@ import (
 
 type Server struct {
 	engine    *engine.Server
-	onConnect func(so *Socket) error
-	onError   func(so *Socket, err error)
+	onConnect func(so Socket) error
+	onError   func(so Socket, err error)
 }
 
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
@@ -69,10 +69,10 @@ func (s *Server) Close() error {
 	return s.engine.Close()
 }
 
-func (s *Server) OnConnect(fn func(so *Socket) error) {
+func (s *Server) OnConnect(fn func(so Socket) error) {
 	s.onConnect = fn
 }
 
-func (s *Server) OnError(fn func(so *Socket, err error)) {
+func (s *Server) OnError(fn func(so Socket, err error)) {
 	s.onError = fn
 }

@@ -8,7 +8,7 @@ import (
 
 type Client struct {
 	engine *engine.Client
-	*Socket
+	Socket
 }
 
 func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (c *Client, err error) {
