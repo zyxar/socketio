@@ -11,8 +11,8 @@ import (
 
 func ExampleDial() {
 	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser,
-		func(socketio.Socket) {
-			log.Println("connected")
+		func(nsp string, _ socketio.Socket) {
+			log.Println(nsp, "connected")
 		})
 	if err != nil {
 		log.Println(err.Error())

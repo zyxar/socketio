@@ -10,11 +10,11 @@ type Client struct {
 	engine *engine.Client
 	Socket
 
-	onConnect func(Socket)
+	onConnect func(string, Socket)
 	onError   func(err interface{})
 }
 
-func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(Socket)) (c *Client, err error) {
+func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(string, Socket)) (c *Client, err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
 		return
@@ -61,7 +61,7 @@ func (c *Client) process(sock *socket, p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
 		if c.onConnect != nil {
-			c.onConnect(sock)
+			c.onConnect(p.Namespace, sock)
 		}
 	case PacketTypeDisconnect:
 		sock.mutex.Lock()

@@ -64,6 +64,9 @@ func (defaultParser) Decoder() Decoder {
 }
 
 func (p *Packet) preprocess() {
+	if p.Namespace != "" && p.Namespace[0] != '/' {
+		p.Namespace = "/" + p.Namespace
+	}
 	p.attachments = 0
 	if d, ok := p.Data.([]interface{}); ok {
 		p.buffer = make([][]byte, 0, len(d))
@@ -156,6 +159,9 @@ func (d *defaultDecoder) Add(msgType MessageType, data []byte) error {
 		if err != nil {
 			return err
 		}
+		if len(p.buffer) != p.attachments {
+			return ErrUnknownPacket
+		}
 		d.lastp = p
 	}
 
@@ -241,9 +247,6 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 			text := s[i:]
 			if p.Type == PacketTypeBinaryEvent {
 				p.buffer, text = extractAttachments(text)
-				if len(p.buffer) != p.attachments {
-					return nil, ErrUnknownPacket
-				}
 			}
 			event, left, match := extractEvent(text)
 			if !match {
@@ -257,9 +260,6 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 		if s[i] == '[' {
 			if p.Type == PacketTypeBinaryAck {
 				p.buffer, text = extractAttachments(text)
-				if len(p.buffer) != p.attachments {
-					return nil, ErrUnknownPacket
-				}
 			}
 		}
 		p.event = &eventArgs{data: text}
