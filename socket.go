@@ -29,11 +29,11 @@ func newServerSocket(so *engine.Socket, parser Parser) (*socket, error) {
 	encoder := parser.Encoder()
 	decoder := parser.Decoder()
 	nspOnConnect := func(nsp string) error {
-		b, _ := encoder.Encode(&Packet{
+		b, _, _ := encoder.Encode(&Packet{
 			Type:      PacketTypeConnect,
 			Namespace: nsp,
 		})
-		return so.Emit(engine.EventMessage, MessageTypeString, b[0])
+		return so.Emit(engine.EventMessage, MessageTypeString, b)
 	}
 	if err := nspOnConnect("/"); err != nil {
 		return nil, err
@@ -91,28 +91,23 @@ func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error)
 		}
 	}
 	p.Data = data
-	b, _ := s.encoder.Encode(p)
-	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
-		return
-	}
-	for _, d := range b[1:] {
-		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
-			return
-		}
-	}
-	return
+	return s.emitPacket(p)
 }
 
 func (s *socket) ack(p *Packet) (err error) {
 	p.Type = PacketTypeAck
-	b, err := s.encoder.Encode(p)
+	return s.emitPacket(p)
+}
+
+func (s *socket) emitPacket(p *Packet) (err error) {
+	b, bin, err := s.encoder.Encode(p)
 	if err != nil {
 		return
 	}
-	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b[0]); err != nil {
+	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b); err != nil {
 		return
 	}
-	for _, d := range b[1:] {
+	for _, d := range bin {
 		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
 			return
 		}

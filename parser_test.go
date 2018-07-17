@@ -26,9 +26,9 @@ func TestParserEncodeDecodeString(t *testing.T) {
 	decoder := DefaultParser.Decoder()
 
 	for i := range packets {
-		if encoded, err := encoder.Encode(&packets[i]); err != nil {
+		if encoded, _, err := encoder.Encode(&packets[i]); err != nil {
 			t.Error(i, err.Error())
-		} else if string(encoded[0]) != encodedData[i] {
+		} else if string(encoded) != encodedData[i] {
 			t.Errorf("%d: %q != %q", i, encoded, encodedData[i])
 		}
 	}
@@ -127,17 +127,17 @@ func TestParserEncodeBinary(t *testing.T) {
 	}, ID: newid(1)}
 	encodedString := `53-1["message",{"_placeholder":true,"num":0},{"_placeholder":true,"num":1},"TEXT",{"_placeholder":true,"num":2}]
 `
-	encoded, err := encoder.Encode(p)
+	encoded, bin, err := encoder.Encode(p)
 	if err != nil {
 		t.Error(err.Error())
 	}
-	if len(encoded) != 4 {
+	if len(bin) != 3 {
 		t.Error("encoded length incorrect")
 	}
-	if string(encoded[0]) != encodedString {
+	if string(encoded) != encodedString {
 		t.Error("encoded string packet incorrect")
 	}
-	for i, e := range encoded[1:] {
+	for i, e := range bin {
 		if bytes.Compare(e, b[i]) != 0 {
 			t.Error("encoded binary incorrect")
 		}

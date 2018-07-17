@@ -68,7 +68,10 @@ func newServer() *socketio.Server {
 				case <-time.After(time.Second * 2):
 					t, _ := time.Now().MarshalBinary()
 					b.Unmarshal(t)
-					so.Emit("/", "event", "check it out!", b)
+					if err := so.Emit("/", "event", "check it out!", b); err != nil {
+						log.Println(err)
+						return
+					}
 				}
 			}
 		}()

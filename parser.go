@@ -38,7 +38,7 @@ type üWriter interface {
 }
 
 type Encoder interface {
-	Encode(p *Packet) ([][]byte, error)
+	Encode(p *Packet) ([]byte, [][]byte, error)
 }
 
 type Decoder interface {
@@ -66,7 +66,7 @@ func (defaultParser) Decoder() Decoder {
 func (p *Packet) preprocess() {
 	p.attachments = 0
 	if d, ok := p.Data.([]interface{}); ok {
-		p.buffer = make([][]byte, 1, len(d)+1)
+		p.buffer = make([][]byte, 0, len(d))
 		for i := range d {
 			if b, ok := d[i].(Binary); ok {
 				d[i] = &binaryWrap{b, p.attachments}
@@ -87,16 +87,12 @@ func (p *Packet) preprocess() {
 
 type defaultEncoder struct{}
 
-func (d defaultEncoder) Encode(p *Packet) ([][]byte, error) {
+func (d defaultEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
 	var buf bytes.Buffer
 	if err := d.encodeTo(&buf, p); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if p.buffer == nil {
-		return [][]byte{buf.Bytes()}, nil
-	}
-	p.buffer[0] = buf.Bytes()
-	return p.buffer, nil
+	return buf.Bytes(), p.buffer, nil
 }
 
 func (defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
