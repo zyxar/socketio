@@ -13,6 +13,17 @@
 vgo get -v -u github.com/zyxar/socketio
 ```
 
+## Features
+
+- compatible with official nodejs implementation (w/o room);
+- `socket.io` server;
+- `socket.io` client (`websocket` only);
+- `engine.io` server;
+- `engine.io` client (`websocket` only);
+- binary data;
+- limited namespace support;
+
+
 ## Example
 
 Server:
@@ -200,11 +211,3 @@ ditto.emit('disguise', 'pidgey', new ArrayBuffer(8));
 The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with revision 4 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
 
 An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface (e.g. `socketio.Bytes`) would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
-
-## TODOs
-
-- [x] socket.io client
-- [x] `namespace`
-- [ ] Room
-- [ ] Broadcasting
-- [ ] engine.io polling client
