@@ -128,51 +128,6 @@ func (s *socket) fire(nsp string, event string, args []byte, buffer [][]byte) ([
 	return s.namespace(nsp).fire(event, args, buffer)
 }
 
-func (s *socket) process(p *Packet) {
-	switch p.Type {
-	case PacketTypeConnect:
-		s.fire(p.Namespace, "connect", nil, nil) // client
-	case PacketTypeDisconnect:
-		s.mutex.Lock()
-		delete(s.nsp, p.Namespace)
-		s.mutex.Unlock()
-	case PacketTypeEvent, PacketTypeBinaryEvent:
-		if p.event != nil {
-			v, err := s.fire(p.Namespace, p.event.name, p.event.data, p.buffer)
-			if err != nil {
-				if s.onError != nil {
-					s.onError(err)
-				}
-				return
-			}
-			if p.ID != nil {
-				p.Data = nil
-				if v != nil {
-					d := make([]interface{}, len(v))
-					for i := range d {
-						d[i] = v[i].Interface()
-					}
-					p.Data = d
-				}
-				if err = s.ack(p); err != nil {
-					if s.onError != nil {
-						s.onError(err)
-					}
-				}
-			}
-		}
-	case PacketTypeAck, PacketTypeBinaryAck:
-		if p.ID != nil && p.event != nil {
-			s.namespace(p.Namespace).onAck(*p.ID, p.event.data, p.buffer)
-		}
-	case PacketTypeError:
-	default:
-		if s.onError != nil {
-			s.onError(ErrUnknownPacket)
-		}
-	}
-}
-
 func (s *socket) yield() *Packet {
 	select {
 	case p := <-s.decoder.Decoded():
