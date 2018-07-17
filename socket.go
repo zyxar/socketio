@@ -7,7 +7,13 @@ import (
 	"github.com/zyxar/socketio/engine"
 )
 
-type Socket struct {
+type Socket interface {
+	Emit(nsp string, event string, args ...interface{}) (err error)
+	On(nsp string, event string, callback interface{})
+	OnError(fn func(err error))
+}
+
+type socket struct {
 	so      *engine.Socket
 	encoder Encoder
 	decoder Decoder
@@ -19,7 +25,7 @@ type Socket struct {
 	mutex sync.RWMutex
 }
 
-func newServerSocket(so *engine.Socket, parser Parser) (*Socket, error) {
+func newServerSocket(so *engine.Socket, parser Parser) (*socket, error) {
 	encoder := parser.Encoder()
 	decoder := parser.Decoder()
 	nspOnConnect := func(nsp string) error {
@@ -32,7 +38,7 @@ func newServerSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 	if err := nspOnConnect("/"); err != nil {
 		return nil, err
 	}
-	socket := &Socket{
+	socket := &socket{
 		so:      so,
 		encoder: encoder,
 		decoder: decoder,
@@ -45,8 +51,8 @@ func newServerSocket(so *engine.Socket, parser Parser) (*Socket, error) {
 	return socket, nil
 }
 
-func newClientSocket(so *engine.Socket, parser Parser) *Socket {
-	return &Socket{
+func newClientSocket(so *engine.Socket, parser Parser) *socket {
+	return &socket{
 		so:      so,
 		encoder: parser.Encoder(),
 		decoder: parser.Decoder(),
@@ -55,7 +61,7 @@ func newClientSocket(so *engine.Socket, parser Parser) *Socket {
 	}
 }
 
-func (s *Socket) namespace(nsp string) *Namespace {
+func (s *socket) namespace(nsp string) *Namespace {
 	if nsp == "" {
 		nsp = "/"
 	}
@@ -71,7 +77,7 @@ func (s *Socket) namespace(nsp string) *Namespace {
 	return n
 }
 
-func (s *Socket) Emit(nsp string, event string, args ...interface{}) (err error) {
+func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error) {
 	data := []interface{}{event}
 	p := &Packet{
 		Type:      PacketTypeEvent,
@@ -97,7 +103,7 @@ func (s *Socket) Emit(nsp string, event string, args ...interface{}) (err error)
 	return
 }
 
-func (s *Socket) ack(p *Packet) (err error) {
+func (s *socket) ack(p *Packet) (err error) {
 	p.Type = PacketTypeAck
 	b, err := s.encoder.Encode(p)
 	if err != nil {
@@ -114,15 +120,15 @@ func (s *Socket) ack(p *Packet) (err error) {
 	return
 }
 
-func (s *Socket) On(nsp string, event string, callback interface{}) {
+func (s *socket) On(nsp string, event string, callback interface{}) {
 	s.namespace(nsp).On(event, callback)
 }
 
-func (s *Socket) fire(nsp string, event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
+func (s *socket) fire(nsp string, event string, args []byte, buffer [][]byte) ([]reflect.Value, error) {
 	return s.namespace(nsp).fire(event, args, buffer)
 }
 
-func (s *Socket) process(p *Packet) {
+func (s *socket) process(p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
 		s.fire(p.Namespace, "connect", nil, nil) // client
@@ -167,7 +173,7 @@ func (s *Socket) process(p *Packet) {
 	}
 }
 
-func (s *Socket) yield() *Packet {
+func (s *socket) yield() *Packet {
 	select {
 	case p := <-s.decoder.Decoded():
 		return p
@@ -176,10 +182,10 @@ func (s *Socket) yield() *Packet {
 	}
 }
 
-func (s *Socket) Close() (err error) {
+func (s *socket) Close() (err error) {
 	return s.so.Close()
 }
 
-func (s *Socket) OnError(fn func(err error)) {
+func (s *socket) OnError(fn func(err error)) {
 	s.onError = fn
 }

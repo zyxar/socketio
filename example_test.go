@@ -42,7 +42,7 @@ func ExampleServer() {
 
 func newServer() *socketio.Server {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
-	server.OnConnect(func(so *socketio.Socket) error {
+	server.OnConnect(func(so socketio.Socket) error {
 		so.On("/", "message", func(data string) {
 			so.Emit("/", "ack", "woot", func(msg string, b *socketio.Bytes) {
 				log.Printf("%s=> %x", msg, b.Marshal())

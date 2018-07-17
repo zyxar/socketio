@@ -29,7 +29,7 @@ import (
 
 func main() {
 	server, _ := socketio.NewServer(time.Second*25, time.Second*5, socketio.DefaultParser)
-	server.OnConnect(func(so *socketio.Socket) error {
+	server.OnConnect(func(so socketio.Socket) error {
 		so.On("/", "message", func(data string) {
 			log.Println(data)
 		})
