@@ -1,6 +1,8 @@
 package socketio
 
 import (
+	"io"
+	"net"
 	"reflect"
 	"sync"
 
@@ -11,6 +13,9 @@ type Socket interface {
 	Emit(nsp string, event string, args ...interface{}) (err error)
 	On(nsp string, event string, callback interface{})
 	OnError(fn func(nsp string, err interface{}))
+	RemoteAddr() net.Addr
+	LocalAddr() net.Addr
+	io.Closer
 }
 
 type socket struct {
@@ -152,3 +157,6 @@ func (s *socket) Close() (err error) {
 func (s *socket) OnError(fn func(nsp string, err interface{})) {
 	s.onError = fn
 }
+
+func (s *socket) LocalAddr() net.Addr  { return s.so.LocalAddr() }
+func (s *socket) RemoteAddr() net.Addr { return s.so.RemoteAddr() }
