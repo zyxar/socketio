@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -32,6 +33,8 @@ type pollingConn struct {
 	readDeadline  atomic.Value
 	writeDeadline atomic.Value
 	paused        atomic.Value
+	localAddr     netAddr
+	remoteAddr    netAddr
 }
 
 func (p *pollingConn) Close() error {
@@ -41,14 +44,26 @@ func (p *pollingConn) Close() error {
 	return nil
 }
 
-func NewPollingConn(bufSize int) *pollingConn {
+func NewPollingConn(bufSize int, localAddr, remoteAddr string) *pollingConn {
 	p := &pollingConn{
-		in:     make(chan *Packet, bufSize),
-		out:    make(chan *Packet, bufSize),
-		closed: make(chan struct{}),
+		in:         make(chan *Packet, bufSize),
+		out:        make(chan *Packet, bufSize),
+		closed:     make(chan struct{}),
+		localAddr:  netAddr{localAddr},
+		remoteAddr: netAddr{remoteAddr},
 	}
 	p.paused.Store(make(chan struct{}))
 	return p
+}
+
+// LocalAddr returns the local network address.
+func (p *pollingConn) LocalAddr() net.Addr {
+	return p.localAddr
+}
+
+// RemoteAddr returns the remote network address.
+func (p *pollingConn) RemoteAddr() net.Addr {
+	return p.remoteAddr
 }
 
 func (p *pollingConn) ReadPacket() (*Packet, error) {
@@ -233,7 +248,19 @@ func (p *pollingConn) Resume() error {
 	return nil
 }
 
-var _ Conn = NewPollingConn(1)
+type netAddr struct {
+	addr string
+}
+
+func (netAddr) Network() string {
+	return "tcp"
+}
+
+func (n netAddr) String() string {
+	return n.addr
+}
+
+var _ Conn = NewPollingConn(1, "", "")
 
 func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	var buf bytes.Buffer

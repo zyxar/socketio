@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -33,6 +34,8 @@ type Conn interface {
 	SetWriteDeadline(t time.Time) error
 	Pause() error
 	Resume() error
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
 }
 
 func getTransport(name string) Transport {
@@ -127,7 +130,7 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 type pollingAcceptor struct{}
 
 func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
-	return NewPollingConn(8), nil
+	return NewPollingConn(8, r.Host, r.RemoteAddr), nil
 }
 
 var PollingAcceptor Acceptor = &pollingAcceptor{}
