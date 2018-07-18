@@ -1,5 +1,6 @@
 package engine
 
+// PacketType indicates type of an engine.io Packet
 type PacketType byte
 
 const (
@@ -12,6 +13,7 @@ const (
 	PacketTypeNoop
 )
 
+// String returns string representation of a PacketType
 func (p PacketType) String() string {
 	switch p {
 	case PacketTypeOpen:
@@ -32,6 +34,7 @@ func (p PacketType) String() string {
 	return "invalid"
 }
 
+// Parameters describes engine.io connection attributes, sending from server to client upon handshaking.
 type Parameters struct {
 	SID          string   `json:"sid"`
 	Upgrades     []string `json:"upgrades"`
@@ -39,6 +42,7 @@ type Parameters struct {
 	PingTimeout  int      `json:"pingTimeout"`
 }
 
+// MessageType indicates type of an engine.io Message
 type MessageType byte
 
 const (
@@ -46,6 +50,7 @@ const (
 	MessageTypeBinary
 )
 
+// String returns string representation of a MessageType
 func (m MessageType) String() string {
 	switch m {
 	case MessageTypeString:
@@ -63,5 +68,6 @@ const (
 	queryBase64    = "b64"
 	queryEIO       = "EIO"
 
+	// Version is engine.io-protocol version
 	Version = "3"
 )

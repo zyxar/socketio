@@ -8,12 +8,14 @@ import (
 	"github.com/zyxar/socketio/engine"
 )
 
+// Server is socket.io server implementation
 type Server struct {
 	engine    *engine.Server
 	onConnect func(so Socket) error
 	onError   func(so Socket, err error)
 }
 
+// NewServer creates a socket.io server instance upon underlying engine.io transport
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
 	e, err := engine.NewServer(interval, timeout, func(so *engine.Socket) {
 		log.Println("socket open")
@@ -66,22 +68,27 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 	return
 }
 
+// ServeHTTP implements http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.engine.ServeHTTP(w, r)
 }
 
+// Close closes underlying engine.io transport
 func (s *Server) Close() error {
 	return s.engine.Close()
 }
 
+// OnConnect registers fn as callback to be called when a socket connects
 func (s *Server) OnConnect(fn func(so Socket) error) {
 	s.onConnect = fn
 }
 
+// OnError registers fn as callback for error handling
 func (s *Server) OnError(fn func(so Socket, err error)) {
 	s.onError = fn
 }
 
+// process is the Packet process handle on server side
 func (*Server) process(sock *socket, p *Packet) {
 	nsp := sock.attachnsp(p.Namespace)
 	switch p.Type {

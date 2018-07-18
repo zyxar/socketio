@@ -13,9 +13,11 @@ import (
 )
 
 var (
+	// ErrUnknownPacket indicates packet invalid or unknown when parser encoding/decoding data
 	ErrUnknownPacket = errors.New("unknown packet")
 )
 
+// Packet is message abstraction, representing for data exchanged between socket.io server and client
 type Packet struct {
 	Type      PacketType
 	Namespace string
@@ -37,15 +39,18 @@ type üWriter interface {
 	io.ByteWriter
 }
 
+// Encoder encodes a Packet into byte format
 type Encoder interface {
 	Encode(p *Packet) ([]byte, [][]byte, error)
 }
 
+// Decoder decodes data into a Packet
 type Decoder interface {
 	Add(msgType MessageType, data []byte) error
 	Decoded() <-chan *Packet
 }
 
+// Parser provides Encoder and Decoder instance, like a factory
 type Parser interface {
 	Encoder() Encoder
 	Decoder() Decoder
@@ -53,6 +58,7 @@ type Parser interface {
 
 type defaultParser struct{}
 
+// DefaultParser is default parser implementation for socket.io, compatible with `socket.io-parser`.
 var DefaultParser Parser = &defaultParser{}
 
 func (defaultParser) Encoder() Encoder {
@@ -228,7 +234,7 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 	}
 	if s[i] >= '0' && s[i] <= '9' { // decode id
 		j := i + 1
-		var id uint64 = uint64(s[i] - '0')
+		var id = uint64(s[i] - '0')
 		for ; j < len(s); j++ {
 			if s[j] >= '0' && s[j] <= '9' {
 				id = id*10 + uint64(s[j]-'0')
@@ -292,14 +298,20 @@ func extractAttachments(b []byte) (buffer [][]byte, left []byte) {
 	return
 }
 
+// MessageType is alias of engine.MessageType
 type MessageType = engine.MessageType
 
-const MessageTypeString MessageType = engine.MessageTypeString
-const MessageTypeBinary MessageType = engine.MessageTypeBinary
+const (
+	// MessageTypeString is alias of engine.MessageTypeString
+	MessageTypeString MessageType = engine.MessageTypeString
+	// MessageTypeBinary is alias of engine.MessageTypeBinary
+	MessageTypeBinary MessageType = engine.MessageTypeBinary
+)
 
 var placeholderExp = regexp.MustCompile(`\s*,\s*\{\s*"_placeholder"\s*:\s*true\s*,\s*"num"\s*:\s*\d*?\s*\}\s*`)
 var eventExp = regexp.MustCompile(`^\[\s*"(?P<event>[^"]+)"\s*,?`)
 
+// Binary refers to binary data to be exchanged between socket.io server and client
 type Binary interface {
 	Marshal() []byte
 	Unmarshal([]byte)
@@ -318,14 +330,17 @@ func (b binaryWrap) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// Bytes is default implementation of Binary interface, a helper to transfer `[]byte`
 type Bytes struct {
 	Data []byte
 }
 
+// Marshal implements Binary interface
 func (b *Bytes) Marshal() []byte {
 	return b.Data[:]
 }
 
+// Unmarshal implements Binary interface
 func (b *Bytes) Unmarshal(p []byte) {
 	b.Data = p
 }

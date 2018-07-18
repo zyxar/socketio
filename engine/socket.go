@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Socket is engine.io connection encapsulation
 type Socket struct {
 	Conn
 	*eventHandlers
@@ -33,6 +34,7 @@ func newSocket(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
 	return so
 }
 
+// CheckPaused blocks when socket is paused
 func (s *Socket) CheckPaused() {
 	<-s.barrier.Load().(chan struct{})
 }
@@ -103,10 +105,12 @@ func (s *Socket) upgrade(transportName string, newConn Conn) {
 	s.fire(EventUpgrade, p.msgType, p.data)
 }
 
+// Handle is event handling helper
 func (s *Socket) Handle() error {
 	return s.eventHandlers.handle(s)
 }
 
+// Close closes underlying connection and background emitter
 func (s *Socket) Close() (err error) {
 	s.once.Do(func() {
 		s.emitter.close()
@@ -115,6 +119,7 @@ func (s *Socket) Close() (err error) {
 	return
 }
 
+// Emit sends event data to remote peer
 func (s *Socket) Emit(event event, msgType MessageType, args interface{}) (err error) {
 	var pktType PacketType
 	switch event {
@@ -131,7 +136,6 @@ func (s *Socket) Emit(event event, msgType MessageType, args interface{}) (err e
 	case EventPong:
 		pktType = PacketTypePong
 	default:
-		err = ErrInvalidEvent
 		return
 	}
 	var data []byte
@@ -149,6 +153,7 @@ func (s *Socket) Emit(event event, msgType MessageType, args interface{}) (err e
 	return s.emitter.submit(&Packet{msgType: msgType, pktType: pktType, data: data})
 }
 
+// Send is short for Emitting message event
 func (s *Socket) Send(args interface{}) (err error) {
 	return s.Emit(EventMessage, MessageTypeString, args)
 }

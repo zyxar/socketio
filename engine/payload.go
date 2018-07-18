@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// ErrInvalidPayload indicates received data is invalid or unrecognized when decoding payload
 	ErrInvalidPayload = errors.New("invalid payload")
 )
 
@@ -17,11 +18,13 @@ type byteReader interface {
 	io.ByteReader
 }
 
+// Payload is a series of Packets
 type Payload struct {
 	packets []Packet
 	xhr2    bool
 }
 
+// ReadFrom implements io.ReaderFrom interface, which decodes data from r and unmarshals to p.
 func (p *Payload) ReadFrom(r io.Reader) (n int64, err error) {
 	if rd, ok := r.(byteReader); ok {
 		return p.readFrom(rd)
@@ -59,6 +62,7 @@ func (p *Payload) readFrom(r byteReader) (n int64, err error) {
 	}
 }
 
+// WriteTo implements io.WriterTo interface, which encodes packets in p and writes to w.
 func (p Payload) WriteTo(w io.Writer) (n int64, err error) {
 	if len(p.packets) == 0 {
 		return
@@ -84,12 +88,14 @@ func (p Payload) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
+// Packet is abstraction of message, exchaged between engine.io server and client
 type Packet struct {
 	msgType MessageType
 	pktType PacketType
 	data    []byte
 }
 
+// packet2 is synonym of Packet, but only used in transmiting XHR2 mode
 type packet2 Packet
 
 func (p *Packet) encodeHead() (int, []byte, []byte) {
@@ -99,7 +105,7 @@ func (p *Packet) encodeHead() (int, []byte, []byte) {
 	switch p.msgType {
 	case MessageTypeString:
 		div = []byte{':', byte(p.pktType) + '0'}
-		length += 1
+		length++
 	case MessageTypeBinary:
 		length = base64.StdEncoding.EncodedLen(length)
 		div = []byte{':', 'b', byte(p.pktType) + '0'}
@@ -112,6 +118,7 @@ func (p *Packet) encodeHead() (int, []byte, []byte) {
 	return length, div, dst
 }
 
+// WriteTo implements io.WriterTo interface, which encodes p and writes to w.
 func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	var nn int
 	length, div, data := p.encodeHead()
@@ -195,7 +202,7 @@ func (p *packet2) WriteTo(w io.Writer) (n int64, err error) {
 	if _, err = w.Write([]byte{byte(p.msgType)}); err != nil {
 		return
 	}
-	n += 1
+	n++
 	length := len(p.data) + 1
 	lb := make([]byte, 0, 8)
 	for length > 0 {

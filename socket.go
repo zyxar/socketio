@@ -9,6 +9,7 @@ import (
 	"github.com/zyxar/socketio/engine"
 )
 
+// Socket is abstraction of bidirectional socket.io connection
 type Socket interface {
 	Emit(nsp string, event string, args ...interface{}) (err error)
 	On(nsp string, event string, callback interface{})

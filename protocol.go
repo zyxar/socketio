@@ -1,12 +1,14 @@
 package socketio
 
 const (
+	// Revision is protocol version
 	Revision = "4"
 )
 
+// PacketType indicates type of a Packet
 type PacketType byte
 
-const (
+const ( // PacketType enums
 	PacketTypeConnect PacketType = iota
 	PacketTypeDisconnect
 	PacketTypeEvent

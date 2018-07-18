@@ -1,13 +1,8 @@
 package engine
 
 import (
-	"errors"
 	"sync"
 	"time"
-)
-
-var (
-	ErrInvalidEvent = errors.New("invalid event")
 )
 
 type event string
@@ -22,12 +17,15 @@ const (
 	EventPong    event = "pong"    // Fired upon receiving a pong packet.
 )
 
+// Callback is a Callable func, default event handler
 type Callback func(typ MessageType, data []byte)
 
+// Callable is event handle to be called when event occurs
 type Callable interface {
 	Call(typ MessageType, data []byte)
 }
 
+// Call implements Callable interface
 func (h Callback) Call(typ MessageType, data []byte) {
 	h(typ, data)
 }

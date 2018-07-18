@@ -6,6 +6,7 @@ import (
 	"github.com/zyxar/socketio/engine"
 )
 
+// Client is socket.io client
 type Client struct {
 	engine *engine.Client
 	Socket
@@ -14,6 +15,7 @@ type Client struct {
 	onError   func(err interface{})
 }
 
+// Dial connects to a socket.io server represented by `rawurl` and create Client instance on success.
 func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(string, Socket)) (c *Client, err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
@@ -52,18 +54,22 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	return
 }
 
+// Id returns session id assigned by socket.io server
 func (c *Client) Id() string {
 	return c.engine.Id()
 }
 
+// Close closes underlying engine.io transport
 func (c *Client) Close() error {
 	return c.engine.Close()
 }
 
+// OnError registers fn as error callback
 func (c *Client) OnError(fn func(interface{})) {
 	c.onError = fn
 }
 
+// process is the Packet process handle on client side
 func (c *Client) process(sock *socket, p *Packet) {
 	nsp := sock.namespace(p.Namespace)
 	switch p.Type {

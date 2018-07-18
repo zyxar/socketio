@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Server is engine.io server implementation
 type Server struct {
 	pingInterval time.Duration
 	pingTimeout  time.Duration
@@ -16,6 +17,7 @@ type Server struct {
 	*sessionManager
 }
 
+// NewServer creates a enine.io server instance
 func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, error) {
 	done := make(chan struct{})
 	s := &Server{
@@ -65,6 +67,7 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 	return s, nil
 }
 
+// Close signals stop to background workers and closes server
 func (s *Server) Close() (err error) {
 	s.once.Do(func() {
 		close(s.done)
@@ -72,6 +75,7 @@ func (s *Server) Close() (err error) {
 	return
 }
 
+// ServeHTTP impements http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.RemoteAddr, r.Method, r.URL.RawQuery)
 

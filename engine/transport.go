@@ -11,20 +11,24 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Transport is compositionof Dailer and Acceptor
 type Transport interface {
 	Dialer
 	Acceptor
 	Name() string
 }
 
+// Dialer dials to remote server and returns a connection instance (client side)
 type Dialer interface {
 	Dial(rawurl string, requestHeader http.Header) (conn Conn, err error)
 }
 
+// Acceptor accepts a connecting requests and creates a connection instance (server side)
 type Acceptor interface {
 	Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error)
 }
 
+// Conn is abstraction of bidirectional engine.io connection
 type Conn interface {
 	PacketReader
 	PacketWriter
@@ -48,10 +52,12 @@ func getTransport(name string) Transport {
 	return nil
 }
 
+// PacketReader reads data from remote and outputs a Packet when appropriate
 type PacketReader interface {
 	ReadPacket() (p *Packet, err error)
 }
 
+// PacketWriter accepts a Packet and sends to remote
 type PacketWriter interface {
 	WritePacket(p *Packet) error
 }
@@ -62,11 +68,11 @@ const (
 )
 
 var (
+	// ErrPauseNotSupported indicates that a connection does not support PAUSE (e.g. websocket)
 	ErrPauseNotSupported = errors.New("transport pause unsupported")
 )
 
-// websocket
-
+// WebsocketTransport is a Transport instance for websocket
 var WebsocketTransport Transport = &websocketTransport{}
 
 type websocketTransport struct {
@@ -111,9 +117,10 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 type pollingAcceptor struct{}
 
 func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
-	return NewPollingConn(8, r.Host, r.RemoteAddr), nil
+	return newPollingConn(8, r.Host, r.RemoteAddr), nil
 }
 
+// PollingAcceptor is an Acceptor instance for polling
 var PollingAcceptor Acceptor = &pollingAcceptor{}
 
 type pollingTransport struct{ *pollingAcceptor }
@@ -126,4 +133,5 @@ func (pollingTransport) Dial(rawurl string, requestHeader http.Header) (Conn, er
 	return nil, errors.New("not implemented")
 }
 
+// PollingTransport is a Transport instance for polling
 var PollingTransport Transport = &pollingTransport{pollingAcceptor: &pollingAcceptor{}}

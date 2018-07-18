@@ -44,7 +44,8 @@ func (p *pollingConn) Close() error {
 	return nil
 }
 
-func NewPollingConn(bufSize int, localAddr, remoteAddr string) *pollingConn {
+// newPollingConn creates an instance of polling connection
+func newPollingConn(bufSize int, localAddr, remoteAddr string) *pollingConn {
 	p := &pollingConn{
 		in:         make(chan *Packet, bufSize),
 		out:        make(chan *Packet, bufSize),
@@ -260,7 +261,7 @@ func (n netAddr) String() string {
 	return n.addr
 }
 
-var _ Conn = NewPollingConn(1, "", "")
+var _ Conn = newPollingConn(1, "", "")
 
 func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	var buf bytes.Buffer

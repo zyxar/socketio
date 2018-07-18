@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Client is engine.io client
 type Client struct {
 	*Socket
 	id           string
@@ -16,6 +17,7 @@ type Client struct {
 	once         sync.Once
 }
 
+// Dial connects to a engine.io server represented by `rawurl` and create Client instance on success.
 func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, err error) {
 	conn, err := dialer.Dial(rawurl, requestHeader)
 	if err != nil {
@@ -77,10 +79,12 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	return
 }
 
+// Ping emits a PING packet to server
 func (c *Client) Ping() error {
 	return c.Emit(EventPing, MessageTypeString, nil)
 }
 
+// Close closes underlying connection and signals stop for background workers
 func (c *Client) Close() (err error) {
 	c.once.Do(func() {
 		close(c.closeChan)
@@ -89,6 +93,7 @@ func (c *Client) Close() (err error) {
 	return
 }
 
+// Id returns session id assigned by server
 func (c *Client) Id() string {
 	return c.id
 }
