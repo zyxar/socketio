@@ -12,6 +12,7 @@ import (
 type Socket interface {
 	Emit(nsp string, event string, args ...interface{}) (err error)
 	On(nsp string, event string, callback interface{})
+	OnDisconnect(fn func(nsp string))
 	OnError(fn func(nsp string, err interface{}))
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
@@ -23,7 +24,8 @@ type socket struct {
 	encoder Encoder
 	decoder Decoder
 
-	onError func(nsp string, err interface{})
+	onError      func(nsp string, err interface{})
+	onDisconnect func(nsp string)
 
 	nsp   map[string]*nspHandle
 	nspL  map[string]struct{}
@@ -150,13 +152,8 @@ func (s *socket) yield() *Packet {
 	}
 }
 
-func (s *socket) Close() (err error) {
-	return s.so.Close()
-}
-
-func (s *socket) OnError(fn func(nsp string, err interface{})) {
-	s.onError = fn
-}
-
-func (s *socket) LocalAddr() net.Addr  { return s.so.LocalAddr() }
-func (s *socket) RemoteAddr() net.Addr { return s.so.RemoteAddr() }
+func (s *socket) Close() (err error)                           { return s.so.Close() }
+func (s *socket) OnError(fn func(nsp string, err interface{})) { s.onError = fn }
+func (s *socket) OnDisconnect(fn func(nsp string))             { s.onDisconnect = fn }
+func (s *socket) LocalAddr() net.Addr                          { return s.so.LocalAddr() }
+func (s *socket) RemoteAddr() net.Addr                         { return s.so.RemoteAddr() }

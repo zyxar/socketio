@@ -48,6 +48,15 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 			log.Println("socket close")
 			socket.Close()
+			socket.mutex.Lock()
+			for k, _ := range socket.nsp {
+				if _, ok := socket.nspL[k]; ok {
+					if socket.onDisconnect != nil {
+						socket.onDisconnect(k)
+					}
+				}
+			}
+			socket.mutex.Unlock()
 		}))
 	})
 	if err != nil {
@@ -79,6 +88,9 @@ func (*Server) process(sock *socket, p *Packet) {
 	case PacketTypeConnect:
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
+		if sock.onDisconnect != nil {
+			sock.onDisconnect(p.Namespace)
+		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
 			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)

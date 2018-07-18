@@ -39,6 +39,13 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 
 	e.Socket.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 		socket.Close()
+		socket.mutex.Lock()
+		for k, _ := range socket.nsp {
+			if socket.onDisconnect != nil {
+				socket.onDisconnect(k)
+			}
+		}
+		socket.mutex.Unlock()
 	}))
 
 	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
@@ -65,9 +72,9 @@ func (c *Client) process(sock *socket, p *Packet) {
 			c.onConnect(p.Namespace, sock)
 		}
 	case PacketTypeDisconnect:
-		sock.mutex.Lock()
-		delete(sock.nsp, p.Namespace)
-		sock.mutex.Unlock()
+		if sock.onDisconnect != nil {
+			sock.onDisconnect(p.Namespace)
+		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
 			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)

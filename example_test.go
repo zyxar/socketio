@@ -61,6 +61,9 @@ func newServer() *socketio.Server {
 			log.Println("foobar:", data)
 			return "foo", "bar"
 		})
+		so.OnDisconnect(func(nsp string) {
+			log.Printf("%q disconnected", nsp)
+		})
 		so.OnError(func(nsp string, err interface{}) {
 			log.Printf("socket nsp=%q, error=%v", nsp, err)
 		})
