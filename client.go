@@ -20,6 +20,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		return
 	}
 	socket := newClientSocket(e.Socket, parser)
+	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
 	e.Socket.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
@@ -48,7 +49,6 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		socket.mutex.Unlock()
 	}))
 
-	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
 	return
 }
 
