@@ -49,8 +49,8 @@ func NewPollingConn(bufSize int, localAddr, remoteAddr string) *pollingConn {
 		in:         make(chan *Packet, bufSize),
 		out:        make(chan *Packet, bufSize),
 		closed:     make(chan struct{}),
-		localAddr:  netAddr{localAddr},
-		remoteAddr: netAddr{remoteAddr},
+		localAddr:  netAddr{addr: localAddr},
+		remoteAddr: netAddr{addr: remoteAddr},
 	}
 	p.paused.Store(make(chan struct{}))
 	return p
@@ -75,7 +75,7 @@ func (p *pollingConn) ReadPacket() (*Packet, error) {
 	if t != nil {
 		deadline := t.(time.Time)
 		if !deadline.IsZero() {
-			timeout := deadline.Sub(time.Now())
+			timeout := time.Until(deadline)
 			if timeout > 0 {
 				timer = time.After(timeout)
 			} else {
@@ -137,7 +137,7 @@ func (p *pollingConn) WritePacket(pkt *Packet) error {
 	if t != nil {
 		deadline := t.(time.Time)
 		if !deadline.IsZero() {
-			timeout := deadline.Sub(time.Now())
+			timeout := time.Until(deadline)
 			if timeout > 0 {
 				timer = time.After(timeout)
 			} else {

@@ -138,7 +138,7 @@ func TestParserEncodeBinary(t *testing.T) {
 		t.Error("encoded string packet incorrect")
 	}
 	for i, e := range bin {
-		if bytes.Compare(e, b[i]) != 0 {
+		if !bytes.Equal(e, b[i]) {
 			t.Error("encoded binary incorrect")
 		}
 	}

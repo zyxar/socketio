@@ -10,7 +10,6 @@ const (
 	PacketTypeMessage
 	PacketTypeUpgrade
 	PacketTypeNoop
-	_PacketTypeMax
 )
 
 func (p PacketType) String() string {
@@ -64,6 +63,5 @@ const (
 	queryBase64    = "b64"
 	queryEIO       = "EIO"
 
-	defaultPathname = "/engine.io/"
-	Version         = "3"
+	Version = "3"
 )

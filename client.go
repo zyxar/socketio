@@ -41,7 +41,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	e.Socket.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
 		socket.Close()
 		socket.mutex.Lock()
-		for k, _ := range socket.nsp {
+		for k := range socket.nsp {
 			if socket.onDisconnect != nil {
 				socket.onDisconnect(k)
 			}

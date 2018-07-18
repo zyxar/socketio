@@ -72,7 +72,7 @@ func (p *Packet) preprocess() {
 		p.buffer = make([][]byte, 0, len(d))
 		for i := range d {
 			if b, ok := d[i].(Binary); ok {
-				d[i] = &binaryWrap{b, p.attachments}
+				d[i] = &binaryWrap{Binary: b, num: p.attachments}
 				p.attachments++
 				p.buffer = append(p.buffer, b.Marshal())
 			}

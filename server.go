@@ -49,7 +49,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			log.Println("socket close")
 			socket.Close()
 			socket.mutex.Lock()
-			for k, _ := range socket.nsp {
+			for k := range socket.nsp {
 				if _, ok := socket.nspL[k]; ok {
 					if socket.onDisconnect != nil {
 						socket.onDisconnect(k)

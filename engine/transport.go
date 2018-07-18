@@ -48,25 +48,6 @@ func getTransport(name string) Transport {
 	return nil
 }
 
-func getAcceptor(name string) Acceptor {
-	switch name {
-	case transportWebsocket:
-		return WebsocketTransport
-	case transportPolling:
-		return PollingAcceptor
-	}
-	return nil
-}
-
-func getDialer(name string) Dialer {
-	switch name {
-	case transportWebsocket:
-		return WebsocketTransport
-	case transportPolling:
-	}
-	return nil
-}
-
 type PacketReader interface {
 	ReadPacket() (p *Packet, err error)
 }
@@ -145,4 +126,4 @@ func (pollingTransport) Dial(rawurl string, requestHeader http.Header) (Conn, er
 	return nil, errors.New("not implemented")
 }
 
-var PollingTransport Transport = &pollingTransport{&pollingAcceptor{}}
+var PollingTransport Transport = &pollingTransport{pollingAcceptor: &pollingAcceptor{}}

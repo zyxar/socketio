@@ -81,9 +81,9 @@ func (w *websocketConn) ReadPacket() (p *Packet, err error) {
 	switch msgType {
 	case websocket.TextMessage:
 		b[0] -= '0'
-		p = &Packet{MessageTypeString, PacketType(b[0]), nil}
+		p = &Packet{msgType: MessageTypeString, pktType: PacketType(b[0])}
 	case websocket.BinaryMessage:
-		p = &Packet{MessageTypeBinary, PacketType(b[0]), nil}
+		p = &Packet{msgType: MessageTypeBinary, pktType: PacketType(b[0])}
 	default:
 		return nil, ErrInvalidPayload
 	}

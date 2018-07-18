@@ -34,9 +34,7 @@ func newSocket(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
 }
 
 func (s *Socket) CheckPaused() {
-	select {
-	case <-s.barrier.Load().(chan struct{}):
-	}
+	<-s.barrier.Load().(chan struct{})
 }
 
 func (s *Socket) pause() {
@@ -103,7 +101,6 @@ func (s *Socket) upgrade(transportName string, newConn Conn) {
 	s.transportName = transportName
 	s.Unlock()
 	s.fire(EventUpgrade, p.msgType, p.data)
-	return
 }
 
 func (s *Socket) Handle() error {
@@ -149,7 +146,7 @@ func (s *Socket) Emit(event event, msgType MessageType, args interface{}) (err e
 		}
 	}
 
-	return s.emitter.submit(&Packet{msgType, pktType, data})
+	return s.emitter.submit(&Packet{msgType: msgType, pktType: pktType, data: data})
 }
 
 func (s *Socket) Send(args interface{}) (err error) {

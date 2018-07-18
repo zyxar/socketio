@@ -15,7 +15,7 @@ func packetEqual(p1, p2 *Packet) bool {
 	if p1.msgType != p2.msgType || p1.pktType != p2.pktType {
 		return false
 	}
-	return bytes.Compare(p1.data, p2.data) == 0
+	return bytes.Equal(p1.data, p2.data)
 }
 
 func packet2Equal(p1, p2 *packet2) bool {
@@ -28,7 +28,7 @@ func packet2Equal(p1, p2 *packet2) bool {
 	if p1.msgType != p2.msgType || p1.pktType != p2.pktType {
 		return false
 	}
-	return bytes.Compare(p1.data, p2.data) == 0
+	return bytes.Equal(p1.data, p2.data)
 }
 
 func TestPacketEncodeDecode(t *testing.T) {
@@ -37,17 +37,17 @@ func TestPacketEncodeDecode(t *testing.T) {
 		Packet  *Packet
 	}{
 		{[]byte("7:4HELLO!"),
-			&Packet{MessageTypeString, PacketTypeMessage, []byte("HELLO!")}},
+			&Packet{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("HELLO!")}},
 		{[]byte("13:4哎喲我操"),
-			&Packet{MessageTypeString, PacketTypeMessage, []byte("哎喲我操")}},
+			&Packet{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("哎喲我操")}},
 		{[]byte("10:b4SEVMTE8h"),
-			&Packet{MessageTypeBinary, PacketTypeMessage, []byte("HELLO!")}},
+			&Packet{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("HELLO!")}},
 		{[]byte("18:b45ZOO5Zay5oiR5pON"),
-			&Packet{MessageTypeBinary, PacketTypeMessage, []byte("哎喲我操")}},
+			&Packet{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("哎喲我操")}},
 		{[]byte("6:2probe"),
-			&Packet{MessageTypeString, PacketTypePing, []byte("probe")}},
+			&Packet{msgType: MessageTypeString, pktType: PacketTypePing, data: []byte("probe")}},
 		{[]byte("1:6"),
-			&Packet{MessageTypeString, PacketTypeNoop, []byte{}}},
+			&Packet{msgType: MessageTypeString, pktType: PacketTypeNoop, data: []byte{}}},
 	}
 	var buf bytes.Buffer
 	for i, d := range testData {
@@ -55,7 +55,7 @@ func TestPacketEncodeDecode(t *testing.T) {
 		if _, err := d.Packet.WriteTo(&buf); err != nil {
 			t.Error(err.Error())
 		}
-		if bytes.Compare(d.encoded, buf.Bytes()) != 0 {
+		if !bytes.Equal(d.encoded, buf.Bytes()) {
 			t.Errorf("%d: encode error: %s != %s", i, d.encoded, buf.Bytes())
 		}
 	}
@@ -82,17 +82,17 @@ func TestPacket2EncodeDecode(t *testing.T) {
 		packet2 *packet2
 	}{
 		{[]byte{0x00, 0x07, 0xFF, 0x04, 'H', 'E', 'L', 'L', 'O', '!'},
-			&packet2{MessageTypeString, PacketTypeMessage, []byte("HELLO!")}},
+			&packet2{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("HELLO!")}},
 		{[]byte{0x00, 0x01, 0x03, 0xFF, 0x04, 0xe5, 0x93, 0x8e, 0xe5, 0x96, 0xb2, 0xe6, 0x88, 0x91, 0xe6, 0x93, 0x8d},
-			&packet2{MessageTypeString, PacketTypeMessage, []byte("哎喲我操")}},
+			&packet2{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("哎喲我操")}},
 		{[]byte{0x01, 0x07, 0xFF, 0x04, 'H', 'E', 'L', 'L', 'O', '!'},
-			&packet2{MessageTypeBinary, PacketTypeMessage, []byte("HELLO!")}},
+			&packet2{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("HELLO!")}},
 		{[]byte{0x01, 0x01, 0x03, 0xFF, 0x04, 0xe5, 0x93, 0x8e, 0xe5, 0x96, 0xb2, 0xe6, 0x88, 0x91, 0xe6, 0x93, 0x8d},
-			&packet2{MessageTypeBinary, PacketTypeMessage, []byte("哎喲我操")}},
+			&packet2{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("哎喲我操")}},
 		{[]byte{0x00, 0x06, 0xFF, 0x02, 'p', 'r', 'o', 'b', 'e'},
-			&packet2{MessageTypeString, PacketTypePing, []byte("probe")}},
+			&packet2{msgType: MessageTypeString, pktType: PacketTypePing, data: []byte("probe")}},
 		{[]byte{0x00, 0x01, 0xFF, 0x06},
-			&packet2{MessageTypeString, PacketTypeNoop, []byte{}}},
+			&packet2{msgType: MessageTypeString, pktType: PacketTypeNoop, data: []byte{}}},
 	}
 	var buf bytes.Buffer
 	for i, d := range testData {
@@ -100,7 +100,7 @@ func TestPacket2EncodeDecode(t *testing.T) {
 		if _, err := d.packet2.WriteTo(&buf); err != nil {
 			t.Error(err.Error())
 		}
-		if bytes.Compare(d.encoded, buf.Bytes()) != 0 {
+		if !bytes.Equal(d.encoded, buf.Bytes()) {
 			t.Errorf("%d: encode error: %x != %x", i, d.encoded, buf.Bytes())
 		}
 	}
@@ -134,12 +134,12 @@ func TestPayloadWriteToReadFrom(t *testing.T) {
 				0x01, 0x07, 0xFF, 0x04, 'H', 'E', 'L', 'L', 'O', '!',
 				0x01, 0x01, 0x03, 0xFF, 0x04, 0xe5, 0x93, 0x8e, 0xe5, 0x96, 0xb2, 0xe6, 0x88, 0x91, 0xe6, 0x93, 0x8d,
 				0x00, 0x06, 0xFF, 0x02, 'p', 'r', 'o', 'b', 'e'},
-			Payload{[]Packet{
-				{MessageTypeString, PacketTypeMessage, []byte("HELLO!")},
-				{MessageTypeString, PacketTypeMessage, []byte("哎喲我操")},
-				{MessageTypeBinary, PacketTypeMessage, []byte("HELLO!")},
-				{MessageTypeBinary, PacketTypeMessage, []byte("哎喲我操")},
-				{MessageTypeString, PacketTypePing, []byte("probe")}}, false}},
+			Payload{packets: []Packet{
+				{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("HELLO!")},
+				{msgType: MessageTypeString, pktType: PacketTypeMessage, data: []byte("哎喲我操")},
+				{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("HELLO!")},
+				{msgType: MessageTypeBinary, pktType: PacketTypeMessage, data: []byte("哎喲我操")},
+				{msgType: MessageTypeString, pktType: PacketTypePing, data: []byte("probe")}}}},
 	}
 	var buf bytes.Buffer
 	for i, d := range testData {
@@ -147,7 +147,7 @@ func TestPayloadWriteToReadFrom(t *testing.T) {
 		if _, err := d.payload.WriteTo(&buf); err != nil {
 			t.Error(i, err.Error())
 		}
-		if bytes.Compare(d.encoded, buf.Bytes()) != 0 {
+		if !bytes.Equal(d.encoded, buf.Bytes()) {
 			t.Errorf("%d: WriteTo/encode error", i)
 		}
 	}
@@ -176,7 +176,7 @@ func TestPayloadWriteToReadFrom(t *testing.T) {
 		if _, err := d.payload.WriteTo(&buf); err != nil {
 			t.Error(i, err.Error())
 		}
-		if bytes.Compare(d.encoded2, buf.Bytes()) != 0 {
+		if !bytes.Equal(d.encoded2, buf.Bytes()) {
 			t.Errorf("%d: WriteTo/encode error", i)
 		}
 	}

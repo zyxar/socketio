@@ -117,5 +117,4 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		ß.ServeHTTP(w, r)
 	}
-	return
 }

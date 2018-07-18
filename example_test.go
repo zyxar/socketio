@@ -28,9 +28,7 @@ func ExampleDial() {
 	c.Emit("/", "binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
 
 	for {
-		select {
-		case <-time.After(time.Second * 2):
-		}
+		<-time.After(time.Second * 2)
 		c.Emit("/", "foobar", "foo", func(a, b string) {
 			log.Println("foobar =>", a, b)
 		})
@@ -70,14 +68,12 @@ func newServer() *socketio.Server {
 		go func() {
 			b := &socketio.Bytes{}
 			for {
-				select {
-				case <-time.After(time.Second * 2):
-					t, _ := time.Now().MarshalBinary()
-					b.Unmarshal(t)
-					if err := so.Emit("/", "event", "check it out!", b); err != nil {
-						log.Println(err)
-						return
-					}
+				<-time.After(time.Second * 2)
+				t, _ := time.Now().MarshalBinary()
+				b.Unmarshal(t)
+				if err := so.Emit("/", "event", "check it out!", b); err != nil {
+					log.Println(err)
+					return
 				}
 			}
 		}()

@@ -41,7 +41,7 @@ func (p *Payload) readFrom(r byteReader) (n int64, err error) {
 				}
 				return n, err
 			}
-			p.packets = append(p.packets, Packet{pkt.msgType, pkt.pktType, pkt.data})
+			p.packets = append(p.packets, Packet(pkt))
 		}
 	} else {
 		for {
@@ -110,18 +110,6 @@ func (p *Packet) encodeHead() (int, []byte, []byte) {
 		panic("invalid message type")
 	}
 	return length, div, dst
-}
-
-func (p *Packet) encode() (encoded []byte) {
-	length, div, data := p.encodeHead()
-	ls := strconv.FormatInt(int64(length), 10)
-	ll := len(ls)
-	payloadLength := length + ll
-	encoded = make([]byte, ll, payloadLength)
-	copy(encoded, ls)
-	encoded = append(encoded, div...)
-	encoded = append(encoded, data...)
-	return
 }
 
 func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
