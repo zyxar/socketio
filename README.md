@@ -1,10 +1,11 @@
 # socketio
 
+[socket.io](https://socket.io/)/[engine.io](https://github.com/socketio/engine.io) implementation in Go
+
 [![GoDoc](https://godoc.org/github.com/zyxar/socketio?status.svg)](https://godoc.org/github.com/zyxar/socketio)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyxar/socketio)](https://goreportcard.com/report/github.com/zyxar/socketio)
 [![license](https://img.shields.io/badge/license-New%20BSD-red.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
-
-[socket.io](https://socket.io/)/[engine.io](https://github.com/socketio/engine.io) in #Go
+[![Build Status](https://travis-ci.org/zyxar/socketio.svg?branch=master)](https://travis-ci.org/zyxar/socketio)
 
 
 ## Install

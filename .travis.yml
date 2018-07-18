@@ -1,0 +1,15 @@
+sudo: false
+language: go
+go:
+- "1.10.x"
+- master
+
+install: true
+
+before_script:
+  - go get -u golang.org/x/vgo
+
+script: make test
+
+notifications:
+  email: false
