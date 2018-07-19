@@ -193,7 +193,7 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 	if b > PacketTypeBinaryAck {
 		return nil, ErrUnknownPacket
 	}
-	p = &Packet{Type: b}
+	p = &Packet{Type: b, Namespace: "/"}
 	i := 1 // skip 1st byte
 
 	if i >= len(s) {
@@ -229,9 +229,8 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 		if i >= len(s) {
 			return p, nil
 		}
-	} else {
-		p.Namespace = "/"
 	}
+
 	if s[i] >= '0' && s[i] <= '9' { // decode id
 		j := i + 1
 		var id = uint64(s[i] - '0')
@@ -248,6 +247,7 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 			return p, nil
 		}
 	}
+
 	if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent { // extracts event but leaves data
 		if s[i] == '[' {
 			text := s[i:]

@@ -52,7 +52,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			socket.Close()
 			socket.mutex.Lock()
 			for k := range socket.nsp {
-				if _, ok := socket.nspL[k]; ok {
+				if _, ok := socket.nspAttr[k]; ok {
 					if socket.onDisconnect != nil {
 						socket.onDisconnect(k)
 					}
@@ -91,6 +91,10 @@ func (s *Server) OnError(fn func(so Socket, err error)) {
 // process is the Packet process handle on server side
 func (*Server) process(sock *socket, p *Packet) {
 	nsp := sock.attachnsp(p.Namespace)
+	if nsp == nil {
+		sock.EmitError(p.Namespace, ErrorNamespaceUnavaialble.Error())
+		return
+	}
 	switch p.Type {
 	case PacketTypeConnect:
 	case PacketTypeDisconnect:

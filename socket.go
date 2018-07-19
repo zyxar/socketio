@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"errors"
 	"io"
 	"net"
 	"reflect"
@@ -9,9 +10,15 @@ import (
 	"github.com/zyxar/socketio/engine"
 )
 
+var (
+	// ErrorNamespaceUnavaialble indicates error of client accessing to a non-existent namespace
+	ErrorNamespaceUnavaialble = errors.New("namespace unavailable")
+)
+
 // Socket is abstraction of bidirectional socket.io connection
 type Socket interface {
 	Emit(nsp string, event string, args ...interface{}) (err error)
+	EmitError(nsp string, arg interface{}) (err error)
 	On(nsp string, event string, callback interface{})
 	OnDisconnect(fn func(nsp string))
 	OnError(fn func(nsp string, err interface{}))
@@ -28,9 +35,9 @@ type socket struct {
 	onError      func(nsp string, err interface{})
 	onDisconnect func(nsp string)
 
-	nsp   map[string]*nspHandle
-	nspL  map[string]struct{}
-	mutex sync.RWMutex
+	nsp     map[string]*nspHandle
+	nspAttr map[string]struct{}
+	mutex   sync.RWMutex
 }
 
 func newServerSocket(so *engine.Socket, parser Parser) *socket {
@@ -41,9 +48,9 @@ func newServerSocket(so *engine.Socket, parser Parser) *socket {
 		encoder: encoder,
 		decoder: decoder,
 		nsp:     make(map[string]*nspHandle),
-		nspL:    make(map[string]struct{}),
+		nspAttr: make(map[string]struct{}),
 	}
-
+	socket.creatensp("/")
 	socket.attachnsp("/")
 	return socket
 }
@@ -58,11 +65,12 @@ func newClientSocket(so *engine.Socket, parser Parser) *socket {
 }
 
 func (s *socket) attachnsp(nsp string) *nspHandle {
-	if nsp == "" {
-		nsp = "/"
+	n, ok := s.namespace(nsp)
+	if !ok {
+		return nil
 	}
 	s.mutex.RLock()
-	_, ok := s.nspL[nsp]
+	_, ok = s.nspAttr[nsp]
 	s.mutex.RUnlock()
 	if !ok {
 		if err := s.emitPacket(&Packet{
@@ -74,35 +82,41 @@ func (s *socket) attachnsp(nsp string) *nspHandle {
 			}
 		}
 		s.mutex.Lock()
-		s.nspL[nsp] = struct{}{}
-		s.mutex.Unlock()
-	}
-	return s.namespace(nsp)
-}
-
-func (s *socket) detachnsp(nsp string) {
-	s.mutex.Lock()
-	delete(s.nspL, nsp)
-	s.mutex.Unlock()
-}
-
-func (s *socket) namespace(nsp string) *nspHandle {
-	if nsp == "" {
-		nsp = "/"
-	}
-	s.mutex.RLock()
-	n, ok := s.nsp[nsp]
-	s.mutex.RUnlock()
-	if !ok {
-		n = newNspHandle(nsp)
-		s.mutex.Lock()
-		s.nsp[nsp] = n
+		s.nspAttr[nsp] = struct{}{}
 		s.mutex.Unlock()
 	}
 	return n
 }
 
+func (s *socket) detachnsp(nsp string) {
+	s.mutex.Lock()
+	delete(s.nspAttr, nsp)
+	s.mutex.Unlock()
+}
+
+func (s *socket) creatensp(nsp string) *nspHandle {
+	s.mutex.Lock()
+	n, ok := s.nsp[nsp]
+	if !ok {
+		n = newNspHandle(nsp)
+		s.nsp[nsp] = n
+	}
+	s.mutex.Unlock()
+	return n
+}
+
+func (s *socket) namespace(nsp string) (*nspHandle, bool) {
+	s.mutex.RLock()
+	n, ok := s.nsp[nsp]
+	s.mutex.RUnlock()
+	return n, ok
+}
+
 func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error) {
+	namespace, ok := s.namespace(nsp)
+	if !ok {
+		return ErrorNamespaceUnavaialble
+	}
 	data := []interface{}{event}
 	p := &Packet{
 		Type:      PacketTypeEvent,
@@ -110,12 +124,21 @@ func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error)
 	}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
-			p.ID = newid(s.namespace(nsp).store(args[i]))
+			p.ID = newid(namespace.store(args[i]))
 		} else {
 			data = append(data, args[i])
 		}
 	}
 	p.Data = data
+	return s.emitPacket(p)
+}
+
+func (s *socket) EmitError(nsp string, arg interface{}) (err error) {
+	p := &Packet{
+		Type:      PacketTypeError,
+		Namespace: nsp,
+		Data:      arg,
+	}
 	return s.emitPacket(p)
 }
 
@@ -141,7 +164,7 @@ func (s *socket) emitPacket(p *Packet) (err error) {
 }
 
 func (s *socket) On(nsp string, event string, callback interface{}) {
-	s.namespace(nsp).On(event, callback)
+	s.creatensp(nsp).On(event, callback)
 }
 
 func (s *socket) yield() *Packet {

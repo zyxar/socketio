@@ -71,7 +71,8 @@ func (c *Client) OnError(fn func(interface{})) {
 
 // process is the Packet process handle on client side
 func (c *Client) process(sock *socket, p *Packet) {
-	nsp := sock.namespace(p.Namespace)
+	nsp := sock.creatensp(p.Namespace)
+
 	switch p.Type {
 	case PacketTypeConnect:
 		if c.onConnect != nil {
