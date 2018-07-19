@@ -11,19 +11,27 @@ func TestPollingConn(t *testing.T) {
 	conn := newPollingConn(0, "", "")
 	defer conn.Close()
 
-	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 10))
+	if err = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 10)); err != nil {
+		t.Error(err.Error())
+	}
 	_, err = conn.ReadPacket() // in
 	if err != ErrPollingConnReadTimeout {
 		t.Error("should be timeout, but:", err)
 	}
-	conn.SetWriteDeadline(time.Now().Add(time.Millisecond * 10))
+	if err = conn.SetWriteDeadline(time.Now().Add(time.Millisecond * 10)); err != nil {
+		t.Error(err.Error())
+	}
 	err = conn.WritePacket(&Packet{msgType: MessageTypeString, pktType: PacketTypeNoop})
 	if err != ErrPollingConnWriteTimeout {
 		t.Error("should be timeout, but:", err)
 	}
 
-	conn.SetReadDeadline(time.Time{})
-	conn.SetWriteDeadline(time.Time{})
+	if err = conn.SetReadDeadline(time.Time{}); err != nil {
+		t.Error(err.Error())
+	}
+	if err = conn.SetWriteDeadline(time.Time{}); err != nil {
+		t.Error(err.Error())
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -42,10 +50,14 @@ func TestPollingConn(t *testing.T) {
 			t.Error("write should be paused, but:", err)
 		}
 	}()
-	conn.Pause()
+	if err = conn.Pause(); err != nil {
+		t.Error(err.Error())
+	}
 	wg.Wait()
 
-	conn.Resume()
+	if err = conn.Resume(); err != nil {
+		t.Error(err.Error())
+	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

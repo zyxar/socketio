@@ -56,11 +56,14 @@ func (e *eventHandlers) fire(event event, typ MessageType, data []byte) {
 	}
 }
 
-func (e *eventHandlers) handle(so *Socket) error {
+func (e *eventHandlers) handle(so *Socket) (err error) {
 	so.RLock()
-	so.SetReadDeadline(time.Now().Add(so.readTimeout))
-	p, err := so.ReadPacket()
+	conn := so.Conn
 	so.RUnlock()
+	if err = conn.SetReadDeadline(time.Now().Add(so.readTimeout)); err != nil {
+		return
+	}
+	p, err := conn.ReadPacket()
 	if err != nil {
 		return err
 	}
@@ -70,7 +73,7 @@ func (e *eventHandlers) handle(so *Socket) error {
 		e.fire(EventClose, p.msgType, p.data)
 		return so.Close()
 	case PacketTypePing:
-		so.Emit(EventPong, p.msgType, p.data)
+		err = so.Emit(EventPong, p.msgType, p.data)
 		e.fire(EventPing, p.msgType, p.data)
 	case PacketTypePong:
 		e.fire(EventPong, p.msgType, p.data)
@@ -82,5 +85,5 @@ func (e *eventHandlers) handle(so *Socket) error {
 	default:
 		return ErrInvalidPayload
 	}
-	return nil
+	return
 }

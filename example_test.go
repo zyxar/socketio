@@ -25,29 +25,30 @@ func ExampleDial() {
 	c.OnError(func(err interface{}) {
 		log.Println(err)
 	})
-	c.Emit("/", "binary", "bytes", &socketio.Bytes{[]byte{1, 2, 3, 4, 5, 6}})
+	if err = c.Emit("/", "binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
+		log.Println(err)
+	}
 
 	for {
 		<-time.After(time.Second * 2)
-		c.Emit("/", "foobar", "foo", func(a, b string) {
+		if err := c.Emit("/", "foobar", "foo", func(a, b string) {
 			log.Println("foobar =>", a, b)
-		})
+		}); err != nil {
+			log.Println(err)
+			break
+		}
 	}
 }
 
 func ExampleServer() {
-	server := newServer()
-	defer server.Close()
-	http.ListenAndServe("localhost:8081", server)
-}
-
-func newServer() *socketio.Server {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
 	server.OnConnect(func(so socketio.Socket) error {
 		so.On("/", "message", func(data string) {
-			so.Emit("/", "ack", "woot", func(msg string, b *socketio.Bytes) {
+			if err := so.Emit("/", "ack", "woot", func(msg string, b *socketio.Bytes) {
 				log.Printf("%s=> %x", msg, b.Marshal())
-			})
+			}); err != nil {
+				log.Println(err)
+			}
 		})
 		so.On("/", "binary", func(data interface{}, b socketio.Bytes) {
 			log.Printf("%s <- %x", data, b.Marshal())
@@ -79,5 +80,7 @@ func newServer() *socketio.Server {
 		}()
 		return so.Emit("/", "event", "hello world!")
 	})
-	return server
+
+	defer server.Close()
+	log.Fatalln(http.ListenAndServe("localhost:8081", server))
 }

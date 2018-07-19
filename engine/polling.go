@@ -159,11 +159,25 @@ func (p *pollingConn) WritePacket(pkt *Packet) error {
 }
 
 func (p *pollingConn) SetReadDeadline(t time.Time) error {
+	select {
+	case <-p.closed:
+		return ErrPollingConnClosed
+	case <-p.pauseChan():
+		return ErrPollingConnPaused
+	default:
+	}
 	p.readDeadline.Store(t)
 	return nil
 }
 
 func (p *pollingConn) SetWriteDeadline(t time.Time) error {
+	select {
+	case <-p.closed:
+		return ErrPollingConnClosed
+	case <-p.pauseChan():
+		return ErrPollingConnPaused
+	default:
+	}
 	p.writeDeadline.Store(t)
 	return nil
 }

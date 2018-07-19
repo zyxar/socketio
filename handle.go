@@ -46,11 +46,12 @@ type ackHandle struct {
 	ackmap sync.Map
 }
 
-func (a *ackHandle) onAck(id uint64, data []byte, buffer [][]byte) {
+func (a *ackHandle) onAck(id uint64, data []byte, buffer [][]byte) (err error) {
 	if fn, ok := a.ackmap.Load(id); ok {
 		a.ackmap.Delete(id)
-		fn.(*handleFn).Call(data, buffer)
+		_, err = fn.(*handleFn).Call(data, buffer)
 	}
+	return
 }
 
 func (a *ackHandle) store(callback interface{}) uint64 {

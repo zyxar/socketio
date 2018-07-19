@@ -9,7 +9,9 @@ install: true
 before_script:
   - go get -u golang.org/x/vgo
 
-script: make test
+script:
+  - make test -C ./engine
+  - make test
 
 notifications:
   email: false
