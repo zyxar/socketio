@@ -77,8 +77,6 @@ func (s *Server) Close() (err error) {
 
 // ServeHTTP impements http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.RemoteAddr, r.Method, r.URL.RawQuery)
-
 	query := r.URL.Query()
 	if query.Get(queryEIO) != Version {
 		http.Error(w, "protocol version incompatible", http.StatusBadRequest)

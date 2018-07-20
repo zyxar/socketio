@@ -1,7 +1,6 @@
 package socketio
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -18,8 +17,6 @@ type Server struct {
 // NewServer creates a socket.io server instance upon underlying engine.io transport
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
 	e, err := engine.NewServer(interval, timeout, func(so *engine.Socket) {
-		log.Println("socket open")
-
 		socket := newServerSocket(so, parser)
 
 		if server.onConnect != nil {
@@ -48,7 +45,6 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		}))
 
 		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
-			log.Println("socket close")
 			socket.Close()
 			socket.mutex.Lock()
 			for k := range socket.nsp {
