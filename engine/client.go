@@ -10,7 +10,6 @@ import (
 // Client is engine.io client
 type Client struct {
 	*Socket
-	id           string
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	closeChan    chan struct{}
@@ -39,13 +38,12 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
 	closeChan := make(chan struct{}, 1)
-	so := newSocket(conn, pingTimeout, pingTimeout)
+	so := newSocket(conn, pingTimeout, pingTimeout, param.SID)
 	c = &Client{
 		Socket:       so,
 		pingInterval: pingInterval,
 		pingTimeout:  pingTimeout,
 		closeChan:    closeChan,
-		id:           param.SID,
 	}
 
 	go func() {
@@ -91,9 +89,4 @@ func (c *Client) Close() (err error) {
 		err = c.Conn.Close()
 	})
 	return
-}
-
-// Id returns session id assigned by server
-func (c *Client) Id() string {
-	return c.id
 }

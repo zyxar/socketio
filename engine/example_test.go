@@ -15,7 +15,7 @@ func ExampleDial() {
 		return
 	}
 	defer c.Close()
-	log.Printf("id=%s\n", c.Id())
+	log.Printf("id=%s\n", c.Sid())
 }
 
 func ExampleServer() {

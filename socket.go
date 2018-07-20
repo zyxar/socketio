@@ -24,6 +24,7 @@ type Socket interface {
 	OnError(fn func(nsp string, err interface{}))
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
+	Sid() string
 	io.Closer
 }
 
@@ -195,6 +196,7 @@ func (s *socket) yield() *Packet {
 	}
 }
 
+func (s *socket) Sid() string                                  { return s.so.Sid() }
 func (s *socket) Close() (err error)                           { return s.so.Close() }
 func (s *socket) OnError(fn func(nsp string, err interface{})) { s.onError = fn }
 func (s *socket) OnDisconnect(fn func(nsp string))             { s.onDisconnect = fn }

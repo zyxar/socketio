@@ -11,7 +11,7 @@ import (
 type Server struct {
 	pingInterval time.Duration
 	pingTimeout  time.Duration
-	ßchan        chan *session
+	ßchan        chan *Socket
 	done         chan struct{}
 	once         sync.Once
 	*sessionManager
@@ -23,7 +23,7 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 	s := &Server{
 		pingInterval:   interval,
 		pingTimeout:    timeout,
-		ßchan:          make(chan *session, 1),
+		ßchan:          make(chan *Socket, 1),
 		done:           done,
 		sessionManager: newSessionManager(),
 	}
@@ -44,23 +44,22 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 					PingTimeout:  int(timeout / time.Millisecond),
 				})
 				go func() {
-					so := ß.Socket
-					defer so.Close()
+					defer ß.Close()
 					defer s.sessionManager.Remove(ß.id)
 					for {
-						if err := so.Handle(); err != nil {
+						if err := ß.Handle(); err != nil {
 							if err == ErrPollingConnPaused {
 								ß.CheckPaused()
 								continue
 							}
 							log.Println("handle:", err.Error())
-							so.fire(EventClose, MessageTypeString, nil)
+							ß.fire(EventClose, MessageTypeString, nil)
 							return
 						}
 					}
 				}()
 
-				onOpen(ß.Socket)
+				onOpen(ß)
 			}
 		}
 	}()
@@ -96,7 +95,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ß := s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
-		ß.Socket.transportName = transport.Name()
+		ß.transportName = transport.Name()
 		select {
 		case <-s.done:
 			return

@@ -54,9 +54,9 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	return
 }
 
-// Id returns session id assigned by socket.io server
-func (c *Client) Id() string {
-	return c.engine.Id()
+// Sid returns session id assigned by socket.io server
+func (c *Client) Sid() string {
+	return c.engine.Sid()
 }
 
 // Close closes underlying engine.io transport

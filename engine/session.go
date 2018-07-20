@@ -4,53 +4,27 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"io"
-	"net/http"
 	"sync"
 	"time"
 )
 
-type session struct {
-	*Socket
-	id string
-}
-
-func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, ok := s.Socket.Conn.(http.Handler); ok {
-		handler.ServeHTTP(w, r)
-	}
-}
-
-func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
+func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
 	id := generateRandomKey(24)
-	s := &session{
-		Socket: &Socket{
-			Conn:          conn,
-			eventHandlers: newEventHandlers(),
-			readTimeout:   readTimeout,
-			writeTimeout:  writeTimeout},
-		id: base64.StdEncoding.EncodeToString(id),
-	}
-	emitter := newEmitter(s.Socket, 8)
-	go emitter.loop()
-	s.Socket.emitter = emitter
-	pauseChan := make(chan struct{})
-	close(pauseChan)
-	s.barrier.Store(pauseChan)
-	return s
+	return newSocket(conn, readTimeout, writeTimeout, base64.StdEncoding.EncodeToString(id))
 }
 
 type sessionManager struct {
-	ß map[string]*session
+	ß map[string]*Socket
 	sync.RWMutex
 }
 
 func newSessionManager() *sessionManager {
 	return &sessionManager{
-		ß: make(map[string]*session),
+		ß: make(map[string]*Socket),
 	}
 }
 
-func (s *sessionManager) Get(id string) (ß *session, b bool) {
+func (s *sessionManager) Get(id string) (ß *Socket, b bool) {
 	s.RLock()
 	ß, b = s.ß[id]
 	s.RUnlock()
@@ -63,7 +37,7 @@ func (s *sessionManager) Remove(id string) {
 	s.Unlock()
 }
 
-func (s *sessionManager) NewSession(conn Conn, readTimeout, writeTimeout time.Duration) *session {
+func (s *sessionManager) NewSession(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
 	ß := newSession(conn, readTimeout, writeTimeout)
 	s.Lock()
 	s.ß[ß.id] = ß
