@@ -76,8 +76,7 @@ var (
 var WebsocketTransport Transport = &websocketTransport{}
 
 type websocketTransport struct {
-	ReadBufferSize  int
-	WriteBufferSize int
+	websocket.Upgrader
 }
 
 func (websocketTransport) Name() string {
@@ -85,12 +84,10 @@ func (websocketTransport) Name() string {
 }
 
 func (t *websocketTransport) Accept(w http.ResponseWriter, r *http.Request) (Conn, error) {
-	upgrader := &websocket.Upgrader{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize,
-		CheckOrigin: func(_ *http.Request) bool {
-			// allow all connections by default
-			return true
-		}}
-	c, err := upgrader.Upgrade(w, r, w.Header())
+	if t.Upgrader.CheckOrigin == nil { // allow all connections by default
+		t.Upgrader.CheckOrigin = func(_ *http.Request) bool { return true }
+	}
+	c, err := t.Upgrader.Upgrade(w, r, w.Header())
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +104,10 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 	q.Set(queryEIO, Version)
 	q.Set(queryTransport, transportWebsocket)
 	u.RawQuery = q.Encode()
-	dialer := &websocket.Dialer{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize}
+	dialer := &websocket.Dialer{
+		ReadBufferSize:  t.Upgrader.ReadBufferSize,
+		WriteBufferSize: t.Upgrader.WriteBufferSize,
+	}
 	c, _, err := dialer.Dial(u.String(), requestHeader)
 	if err != nil {
 		return nil, err
@@ -116,18 +116,16 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 	return &websocketConn{conn: c}, nil
 }
 
-// polling
-
 type pollingAcceptor struct{}
 
-func (p *pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
+func (pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
 	return newPollingConn(8, r.Host, r.RemoteAddr), nil
 }
 
 // PollingAcceptor is an Acceptor instance for polling
 var PollingAcceptor Acceptor = &pollingAcceptor{}
 
-type pollingTransport struct{ *pollingAcceptor }
+type pollingTransport struct{ pollingAcceptor }
 
 func (pollingTransport) Name() string {
 	return transportPolling
@@ -138,4 +136,4 @@ func (pollingTransport) Dial(rawurl string, requestHeader http.Header) (Conn, er
 }
 
 // PollingTransport is a Transport instance for polling
-var PollingTransport Transport = &pollingTransport{pollingAcceptor: &pollingAcceptor{}}
+var PollingTransport Transport = &pollingTransport{}
