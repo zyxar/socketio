@@ -214,7 +214,11 @@ func (p *packet2) WriteTo(w io.Writer) (n int64, err error) {
 	for i := len(lb); i > 0; i-- {
 		buf = append(buf, lb[i-1])
 	}
-	buf = append(buf, 0xFF, byte(p.pktType))
+	b := byte(p.pktType)
+	if p.msgType == MessageTypeString {
+		b += '0'
+	}
+	buf = append(buf, 0xFF, b)
 	nn, err := w.Write(buf)
 	if err != nil {
 		return
@@ -256,6 +260,9 @@ func (p *packet2) decodeHead(r io.ByteReader) (n int, length int, err error) {
 		return
 	}
 	n++
+	if p.msgType == MessageTypeString {
+		b -= '0'
+	}
 	p.pktType = PacketType(b)
 	length--
 	return
