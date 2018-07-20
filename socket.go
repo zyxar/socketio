@@ -90,7 +90,26 @@ func (s *socket) attachnsp(nsp string) *nspHandle {
 
 func (s *socket) detachnsp(nsp string) {
 	s.mutex.Lock()
-	delete(s.nspAttr, nsp)
+	_, ok := s.nspAttr[nsp]
+	if ok {
+		delete(s.nspAttr, nsp)
+	}
+	s.mutex.Unlock()
+	if ok && s.onDisconnect != nil {
+		s.onDisconnect(nsp)
+	}
+}
+
+func (s *socket) detachall() {
+	s.mutex.Lock()
+	for k := range s.nsp {
+		if _, ok := s.nspAttr[k]; ok {
+			delete(s.nspAttr, k)
+			if s.onDisconnect != nil {
+				s.onDisconnect(k)
+			}
+		}
+	}
 	s.mutex.Unlock()
 }
 
