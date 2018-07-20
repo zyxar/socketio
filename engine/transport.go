@@ -85,7 +85,11 @@ func (websocketTransport) Name() string {
 }
 
 func (t *websocketTransport) Accept(w http.ResponseWriter, r *http.Request) (Conn, error) {
-	upgrader := &websocket.Upgrader{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize}
+	upgrader := &websocket.Upgrader{ReadBufferSize: t.ReadBufferSize, WriteBufferSize: t.WriteBufferSize,
+		CheckOrigin: func(_ *http.Request) bool {
+			// allow all connections by default
+			return true
+		}}
 	c, err := upgrader.Upgrade(w, r, w.Header())
 	if err != nil {
 		return nil, err
