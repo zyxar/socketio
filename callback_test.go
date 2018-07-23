@@ -35,7 +35,9 @@ func TestBufferHandleFn(t *testing.T) {
 		if evt != "message" || c != "c" || d != "d" {
 			t.Error("handle string error")
 		}
-		if !bytes.Equal(b.Marshal(), b1) || !bytes.Equal(e.Marshal(), b2) {
+		bb, _ := b.MarshalBinary()
+		eb, _ := e.MarshalBinary()
+		if !bytes.Equal(bb, b1) || !bytes.Equal(eb, b2) {
 			t.Error("handle binary error")
 		}
 	})

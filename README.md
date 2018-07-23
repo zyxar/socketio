@@ -118,16 +118,18 @@ Server:
 ```go
 	so.On("/", "binary", func(data interface{}, b *socketio.Bytes) {
 		log.Println(data)
-		log.Printf("%x", b.Marshal())
+		bb, _ := b.MarshalBinary()
+		log.Printf("%x", bb)
 	})
 	go func() {
-		b := &socketio.Bytes{}
 		for {
 			select {
 			case <-time.After(time.Second * 2):
-				t, _ := time.Now().MarshalBinary()
-				b.Unmarshal(t)
-				so.Emit("/", "event", "check it out!", b)
+				t := time.Now()
+				if err := so.Emit("/", "event", "check it out!", &t); err != nil {
+					log.Println(err)
+					return
+				}
 			}
 		}
 	}()
@@ -157,13 +159,12 @@ type ProtoMessage struct {
 	proto.Message
 }
 
-func (p ProtoMessage) Marshal() []byte {
-	b, _ := proto.Marshal(p.Message)
-	return b
+func (p ProtoMessage) MarshalBinary() ([]byte, error) {
+	return proto.Marshal(p.Message)
 }
 
-func (p *ProtoMessage) Unmarshal(b []byte) {
-	proto.Unmarshal(b, p.Message)
+func (p *ProtoMessage) UnmarshalBinary(b []byte) error {
+	return proto.Unmarshal(b, p.Message)
 }
 ```
 
@@ -181,13 +182,13 @@ type MessagePack struct {
 	}
 }
 
-func (m MessagePack) Marshal() []byte {
-	b, _ := m.Message.MarshalMsg(nil)
-	return b
+func (m MessagePack) MarshalBinary() ([]byte, error) {
+	return m.Message.MarshalMsg(nil)
 }
 
-func (m *MessagePack) Unmarshal(b []byte) {
-	m.Message.UnmarshalMsg(b)
+func (m *MessagePack) UnmarshalBinary(b []byte) error {
+	_, err := m.Message.UnmarshalMsg(b)
+	return err
 }
 ```
 
@@ -197,7 +198,8 @@ func (m *MessagePack) Unmarshal(b []byte) {
 Server:
 ```go
 	so.On("/ditto", "disguise", func(msg interface{}, b socketio.Bytes) {
-		log.Printf("%v: %x", msg, b.Marshal())
+		bb, _ := b.MarshalBinary()
+		log.Printf("%v: %x", msg, bb)
 	})
 ```
 

@@ -20,7 +20,8 @@ func ExampleDial() {
 	}
 	defer c.Close()
 	c.On("/", "event", func(message string, b socketio.Bytes) {
-		log.Printf("%s => %x", message, b.Marshal())
+		bb, _ := b.MarshalBinary()
+		log.Printf("%s => %x", message, bb)
 	})
 	c.OnError(func(err interface{}) {
 		log.Println(err)
@@ -45,16 +46,19 @@ func ExampleServer() {
 	server.OnConnect(func(so socketio.Socket) error {
 		so.On("/", "message", func(data string) {
 			if err := so.Emit("/", "ack", "woot", func(msg string, b *socketio.Bytes) {
-				log.Printf("%s=> %x", msg, b.Marshal())
+				bb, _ := b.MarshalBinary()
+				log.Printf("%s=> %x", msg, bb)
 			}); err != nil {
 				log.Println(err)
 			}
 		})
 		so.On("/", "binary", func(data interface{}, b socketio.Bytes) {
-			log.Printf("%s <- %x", data, b.Marshal())
+			bb, _ := b.MarshalBinary()
+			log.Printf("%s <- %x", data, bb)
 		})
 		so.On("/ditto", "disguise", func(msg interface{}, b socketio.Bytes) {
-			log.Printf("%v: %x", msg, b.Marshal())
+			bb, _ := b.MarshalBinary()
+			log.Printf("%v: %x", msg, bb)
 		})
 		so.On("/", "foobar", func(data string) (string, string) {
 			log.Println("foobar:", data)
@@ -67,12 +71,10 @@ func ExampleServer() {
 			log.Printf("socket nsp=%q, error=%v", nsp, err)
 		})
 		go func() {
-			b := &socketio.Bytes{}
 			for {
 				<-time.After(time.Second * 2)
-				t, _ := time.Now().MarshalBinary()
-				b.Unmarshal(t)
-				if err := so.Emit("/", "event", "check it out!", b); err != nil {
+				t := time.Now()
+				if err := so.Emit("/", "event", "check it out!", &t); err != nil {
 					log.Println(err)
 					return
 				}

@@ -39,7 +39,9 @@ func (e *handleFn) Call(data []byte, buffer [][]byte) ([]reflect.Value, error) {
 		it := in[i].Interface()
 		if b, ok := it.(Binary); ok {
 			if len(buffer) > 0 {
-				b.Unmarshal(buffer[0])
+				if err := b.UnmarshalBinary(buffer[0]); err != nil {
+					return nil, err
+				}
 				buffer = buffer[1:]
 			}
 		} else {

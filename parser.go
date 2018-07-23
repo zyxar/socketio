@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,7 +81,8 @@ func (p *Packet) preprocess() {
 			if b, ok := d[i].(Binary); ok {
 				d[i] = &binaryWrap{Binary: b, num: p.attachments}
 				p.attachments++
-				p.buffer = append(p.buffer, b.Marshal())
+				bb, _ := b.MarshalBinary()
+				p.buffer = append(p.buffer, bb)
 			}
 		}
 	}
@@ -313,8 +315,8 @@ var eventExp = regexp.MustCompile(`^\[\s*"(?P<event>[^"]+)"\s*,?`)
 
 // Binary refers to binary data to be exchanged between socket.io server and client
 type Binary interface {
-	Marshal() []byte
-	Unmarshal([]byte)
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
 }
 
 type binaryWrap struct {
@@ -336,11 +338,12 @@ type Bytes struct {
 }
 
 // Marshal implements Binary interface
-func (b *Bytes) Marshal() []byte {
-	return b.Data[:]
+func (b *Bytes) MarshalBinary() ([]byte, error) {
+	return b.Data[:], nil
 }
 
 // Unmarshal implements Binary interface
-func (b *Bytes) Unmarshal(p []byte) {
+func (b *Bytes) UnmarshalBinary(p []byte) error {
 	b.Data = p
+	return nil
 }
