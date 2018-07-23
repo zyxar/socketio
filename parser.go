@@ -78,8 +78,8 @@ func (p *Packet) preprocess() {
 	if d, ok := p.Data.([]interface{}); ok {
 		p.buffer = make([][]byte, 0, len(d))
 		for i := range d {
-			if b, ok := d[i].(Binary); ok {
-				d[i] = &binaryWrap{Binary: b, num: p.attachments}
+			if b, ok := d[i].(encoding.BinaryMarshaler); ok {
+				d[i] = &placeholder{num: p.attachments}
 				p.attachments++
 				bb, _ := b.MarshalBinary()
 				p.buffer = append(p.buffer, bb)
@@ -319,12 +319,11 @@ type Binary interface {
 	encoding.BinaryUnmarshaler
 }
 
-type binaryWrap struct {
-	Binary
+type placeholder struct {
 	num int
 }
 
-func (b binaryWrap) MarshalJSON() ([]byte, error) {
+func (b placeholder) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	if _, err := fmt.Fprintf(&buf, `{"_placeholder":true,"num":%d}`, b.num); err != nil {
 		return nil, err

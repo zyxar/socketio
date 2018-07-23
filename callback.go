@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"encoding"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -37,7 +38,7 @@ func (e *handleFn) Call(data []byte, buffer [][]byte) ([]reflect.Value, error) {
 		}
 		in[i] = reflect.New(typ)
 		it := in[i].Interface()
-		if b, ok := it.(Binary); ok {
+		if b, ok := it.(encoding.BinaryUnmarshaler); ok {
 			if len(buffer) > 0 {
 				if err := b.UnmarshalBinary(buffer[0]); err != nil {
 					return nil, err

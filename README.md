@@ -125,8 +125,7 @@ Server:
 		for {
 			select {
 			case <-time.After(time.Second * 2):
-				t := time.Now()
-				if err := so.Emit("/", "event", "check it out!", &t); err != nil {
+				if err := so.Emit("/", "event", "check it out!", time.Now()); err != nil {
 					log.Println(err)
 					return
 				}
