@@ -2,7 +2,6 @@ package engine
 
 import (
 	"sync"
-	"time"
 )
 
 type event string
@@ -54,36 +53,4 @@ func (e *eventHandlers) fire(event event, typ MessageType, data []byte) {
 	if ok {
 		callable.Call(typ, data)
 	}
-}
-
-func (e *eventHandlers) handle(so *Socket) (err error) {
-	so.RLock()
-	conn := so.Conn
-	so.RUnlock()
-	if err = conn.SetReadDeadline(time.Now().Add(so.readTimeout)); err != nil {
-		return
-	}
-	p, err := conn.ReadPacket()
-	if err != nil {
-		return err
-	}
-	switch p.pktType {
-	case PacketTypeOpen:
-	case PacketTypeClose:
-		e.fire(EventClose, p.msgType, p.data)
-		return so.Close()
-	case PacketTypePing:
-		err = so.Emit(EventPong, p.msgType, p.data)
-		e.fire(EventPing, p.msgType, p.data)
-	case PacketTypePong:
-		e.fire(EventPong, p.msgType, p.data)
-	case PacketTypeMessage:
-		e.fire(EventMessage, p.msgType, p.data)
-	case PacketTypeUpgrade:
-	case PacketTypeNoop:
-		// noop
-	default:
-		return ErrInvalidPayload
-	}
-	return
 }

@@ -110,6 +110,17 @@ func (p *pollingConn) FlushOut() (packets []*Packet) {
 	}
 }
 
+func (p *pollingConn) FlushIn() (packets []*Packet) {
+	for {
+		select {
+		case pkt := <-p.in:
+			packets = append(packets, pkt)
+		default:
+			return
+		}
+	}
+}
+
 func (p *pollingConn) ReadPacketOut(ctx context.Context) (*Packet, error) {
 	if p.isClosed() {
 		return nil, ErrPollingConnClosed
@@ -183,6 +194,10 @@ func (p *pollingConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if p.isClosed() {
+		http.Error(w, ErrPollingConnClosed.Error(), http.StatusBadRequest)
+		return
+	}
 	switch r.Method {
 	case "GET":
 		pkt, err := p.ReadPacketOut(r.Context())

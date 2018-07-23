@@ -107,3 +107,4 @@ func (w *websocketConn) SetWriteDeadline(t time.Time) error {
 func (*websocketConn) Pause() error        { return ErrPauseNotSupported }
 func (*websocketConn) Resume() error       { return nil }
 func (*websocketConn) FlushOut() []*Packet { return nil }
+func (*websocketConn) FlushIn() []*Packet  { return nil }

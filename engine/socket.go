@@ -106,12 +106,51 @@ func (s *Socket) upgrade(transportName string, newConn Conn) {
 	s.Conn = newConn
 	s.transportName = transportName
 	s.Unlock()
+
+	if packets := conn.FlushIn(); packets != nil {
+		for _, packet := range packets {
+			s.handle(packet)
+		}
+	}
+
 	s.fire(EventUpgrade, p.msgType, p.data)
 }
 
 // Handle is event handling helper
-func (s *Socket) Handle() error {
-	return s.eventHandlers.handle(s)
+func (s *Socket) Handle() (err error) {
+	s.RLock()
+	conn := s.Conn
+	s.RUnlock()
+	if err = conn.SetReadDeadline(time.Now().Add(s.readTimeout)); err != nil {
+		return
+	}
+	p, err := conn.ReadPacket()
+	if err != nil {
+		return err
+	}
+	return s.handle(p)
+}
+
+func (s *Socket) handle(p *Packet) (err error) {
+	switch p.pktType {
+	case PacketTypeOpen:
+	case PacketTypeClose:
+		s.fire(EventClose, p.msgType, p.data)
+		return s.Close()
+	case PacketTypePing:
+		err = s.Emit(EventPong, p.msgType, p.data)
+		s.fire(EventPing, p.msgType, p.data)
+	case PacketTypePong:
+		s.fire(EventPong, p.msgType, p.data)
+	case PacketTypeMessage:
+		s.fire(EventMessage, p.msgType, p.data)
+	case PacketTypeUpgrade:
+	case PacketTypeNoop:
+		// noop
+	default:
+		return ErrInvalidPayload
+	}
+	return
 }
 
 // Close closes underlying connection and background emitter
