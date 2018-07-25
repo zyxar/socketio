@@ -90,33 +90,49 @@ func (*Server) process(sock *socket, p *Packet) {
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
 	case PacketTypeEvent, PacketTypeBinaryEvent:
-		if p.event != nil {
-			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)
+		event, data, bin, err := sock.decoder.ParseData(p)
+		if err != nil {
+			if sock.onError != nil {
+				sock.onError(p.Namespace, err)
+			}
+			return
+		}
+		if event == "" {
+			return
+		}
+		v, err := nsp.fire(event, data, bin)
+		if err != nil {
+			if sock.onError != nil {
+				sock.onError(p.Namespace, err)
+			}
+			return
+		}
+		if p.ID != nil {
+			p.Data = nil
+			if v != nil {
+				d := make([]interface{}, len(v))
+				for i := range d {
+					d[i] = v[i].Interface()
+				}
+				p.Data = d
+			}
+			if err = sock.ack(p); err != nil {
+				if sock.onError != nil {
+					sock.onError(p.Namespace, err)
+				}
+			}
+		}
+
+	case PacketTypeAck, PacketTypeBinaryAck:
+		if p.ID != nil {
+			_, data, bin, err := sock.decoder.ParseData(p)
 			if err != nil {
 				if sock.onError != nil {
 					sock.onError(p.Namespace, err)
 				}
 				return
 			}
-			if p.ID != nil {
-				p.Data = nil
-				if v != nil {
-					d := make([]interface{}, len(v))
-					for i := range d {
-						d[i] = v[i].Interface()
-					}
-					p.Data = d
-				}
-				if err = sock.ack(p); err != nil {
-					if sock.onError != nil {
-						sock.onError(p.Namespace, err)
-					}
-				}
-			}
-		}
-	case PacketTypeAck, PacketTypeBinaryAck:
-		if p.ID != nil && p.event != nil {
-			nsp.onAck(*p.ID, p.event.data, p.buffer)
+			nsp.onAck(*p.ID, data, bin)
 		}
 	case PacketTypeError:
 		if sock.onError != nil {

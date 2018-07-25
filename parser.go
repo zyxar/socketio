@@ -11,24 +11,14 @@ import (
 	"strconv"
 
 	"github.com/zyxar/socketio/engine"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 var (
 	// ErrUnknownPacket indicates packet invalid or unknown when parser encoding/decoding data
 	ErrUnknownPacket = errors.New("unknown packet")
 )
-
-// Packet is message abstraction, representing for data exchanged between socket.io server and client
-type Packet struct {
-	Type      PacketType
-	Namespace string
-	Data      interface{}
-	ID        *uint64
-
-	event       *eventArgs
-	attachments int
-	buffer      [][]byte
-}
 
 type eventArgs struct {
 	name string
@@ -49,6 +39,7 @@ type Encoder interface {
 type Decoder interface {
 	Add(msgType MessageType, data []byte) error
 	Decoded() <-chan *Packet
+	ParseData(p *Packet) (string, []byte, [][]byte, error)
 }
 
 // Parser provides Encoder and Decoder instance, like a factory
@@ -70,7 +61,17 @@ func (defaultParser) Decoder() Decoder {
 	return newDefaultDecoder()
 }
 
-func (p *Packet) preprocess() {
+type defaultEncoder struct{}
+
+func (d defaultEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
+	var buf bytes.Buffer
+	if err := d.encodeTo(&buf, p); err != nil {
+		return nil, nil, err
+	}
+	return buf.Bytes(), p.buffer, nil
+}
+
+func (defaultEncoder) preprocess(p *Packet) {
 	if p.Namespace != "" && p.Namespace[0] != '/' {
 		p.Namespace = "/" + p.Namespace
 	}
@@ -96,18 +97,8 @@ func (p *Packet) preprocess() {
 	}
 }
 
-type defaultEncoder struct{}
-
-func (d defaultEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
-	var buf bytes.Buffer
-	if err := d.encodeTo(&buf, p); err != nil {
-		return nil, nil, err
-	}
-	return buf.Bytes(), p.buffer, nil
-}
-
-func (defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
-	p.preprocess()
+func (d defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
+	d.preprocess(p)
 
 	if err = w.WriteByte(byte(p.Type) + '0'); err != nil {
 		return
@@ -148,6 +139,13 @@ func newDefaultDecoder() *defaultDecoder {
 	return &defaultDecoder{
 		packets: make(chan *Packet, 8),
 	}
+}
+
+func (defaultDecoder) ParseData(p *Packet) (string, []byte, [][]byte, error) {
+	if p.event == nil {
+		return "", nil, nil, nil
+	}
+	return p.event.name, p.event.data, p.buffer, nil
 }
 
 func (d *defaultDecoder) Decoded() <-chan *Packet {
@@ -337,7 +335,7 @@ type Bytes struct {
 }
 
 // Marshal implements Binary interface
-func (b *Bytes) MarshalBinary() ([]byte, error) {
+func (b Bytes) MarshalBinary() ([]byte, error) {
 	return b.Data[:], nil
 }
 
@@ -346,3 +344,89 @@ func (b *Bytes) UnmarshalBinary(p []byte) error {
 	b.Data = p
 	return nil
 }
+
+// MarshalBinaryTo copies data into 'p', implementing msgp.Extension.MarshalBinaryTo
+func (b *Bytes) MarshalBinaryTo(p []byte) error {
+	copy(p, b.Data)
+	return nil
+}
+
+// parser - msgp
+
+var MsgpackParser Parser = &msgpackParser{}
+
+type msgpackParser struct{}
+type msgpackEncoder struct{}
+type msgpackDecoder struct{ packets chan *Packet }
+
+func (msgpackParser) Encoder() Encoder { return &msgpackEncoder{} }
+func (msgpackParser) Decoder() Decoder { return newMsgpackDecoder(8) }
+
+func (msgpackEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
+	switch p.Type {
+	case PacketTypeConnect, PacketTypeDisconnect, PacketTypeError:
+		b, err := json.Marshal(p)
+		return b, nil, err
+	default:
+	}
+	o, err := p.MarshalMsg(nil)
+	return nil, [][]byte{o}, err
+}
+
+func newMsgpackDecoder(size int) *msgpackDecoder {
+	return &msgpackDecoder{packets: make(chan *Packet, size)}
+}
+
+func (msgpackDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
+		if d, ok := p.Data.([]interface{}); ok {
+			var args []interface{}
+			for i := range d {
+				if raw, ok := d[i].(*msgp.RawExtension); ok {
+					bin = append(bin, raw.Data)
+				} else {
+					args = append(args, d[i])
+				}
+			}
+			if len(args) > 0 {
+				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
+					if evt, ok := args[0].(string); ok {
+						event = evt
+					} else {
+						err = fmt.Errorf("first argument should be event name but got %T", args[0])
+						return
+					}
+					args = args[1:]
+				}
+				data, err = json.Marshal(args)
+				return
+			}
+		} else {
+			err = fmt.Errorf("packet data should be an array but got %T", p.Data)
+			return
+		}
+	default:
+	}
+	return
+}
+
+func (m *msgpackDecoder) Add(msgType MessageType, data []byte) (err error) {
+	var p Packet
+	switch msgType {
+	case MessageTypeString:
+		err = json.Unmarshal(data, &p)
+	case MessageTypeBinary:
+		_, err = p.UnmarshalMsg(data)
+	}
+	if err != nil {
+		return err
+	}
+	if p.Namespace == "" {
+		p.Namespace = "/"
+	}
+	m.packets <- &p
+	return nil
+}
+
+func (m *msgpackDecoder) Decoded() <-chan *Packet { return m.packets }
