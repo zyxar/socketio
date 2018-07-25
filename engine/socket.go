@@ -95,11 +95,10 @@ func (s *Socket) upgrade(transportName string, newConn Conn) {
 	}
 
 	conn.Close()
-	if packets := conn.FlushOut(); packets != nil {
+
+	for _, packet := range conn.FlushOut() {
 		newConn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-		for _, packet := range packets {
-			newConn.WritePacket(packet)
-		}
+		newConn.WritePacket(packet)
 	}
 
 	s.Lock()
@@ -107,10 +106,8 @@ func (s *Socket) upgrade(transportName string, newConn Conn) {
 	s.transportName = transportName
 	s.Unlock()
 
-	if packets := conn.FlushIn(); packets != nil {
-		for _, packet := range packets {
-			s.handle(packet)
-		}
+	for _, packet := range conn.FlushIn() {
+		s.handle(packet)
 	}
 
 	s.fire(EventUpgrade, p.msgType, p.data)
