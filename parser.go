@@ -18,18 +18,6 @@ var (
 	ErrUnknownPacket = errors.New("unknown packet")
 )
 
-// Packet is message abstraction, representing for data exchanged between socket.io server and client
-type Packet struct {
-	Type      PacketType
-	Namespace string
-	Data      interface{}
-	ID        *uint64
-
-	event       *eventArgs
-	attachments int
-	buffer      [][]byte
-}
-
 type eventArgs struct {
 	name string
 	data []byte
@@ -70,7 +58,17 @@ func (defaultParser) Decoder() Decoder {
 	return newDefaultDecoder()
 }
 
-func (p *Packet) preprocess() {
+type defaultEncoder struct{}
+
+func (d defaultEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
+	var buf bytes.Buffer
+	if err := d.encodeTo(&buf, p); err != nil {
+		return nil, nil, err
+	}
+	return buf.Bytes(), p.buffer, nil
+}
+
+func (defaultEncoder) preprocess(p *Packet) {
 	if p.Namespace != "" && p.Namespace[0] != '/' {
 		p.Namespace = "/" + p.Namespace
 	}
@@ -96,18 +94,8 @@ func (p *Packet) preprocess() {
 	}
 }
 
-type defaultEncoder struct{}
-
-func (d defaultEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
-	var buf bytes.Buffer
-	if err := d.encodeTo(&buf, p); err != nil {
-		return nil, nil, err
-	}
-	return buf.Bytes(), p.buffer, nil
-}
-
-func (defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
-	p.preprocess()
+func (d defaultEncoder) encodeTo(w üWriter, p *Packet) (err error) {
+	d.preprocess(p)
 
 	if err = w.WriteByte(byte(p.Type) + '0'); err != nil {
 		return
