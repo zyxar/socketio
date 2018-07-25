@@ -11,6 +11,8 @@ import (
 	"strconv"
 
 	"github.com/zyxar/socketio/engine"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 var (
@@ -325,7 +327,7 @@ type Bytes struct {
 }
 
 // Marshal implements Binary interface
-func (b *Bytes) MarshalBinary() ([]byte, error) {
+func (b Bytes) MarshalBinary() ([]byte, error) {
 	return b.Data[:], nil
 }
 
@@ -334,3 +336,86 @@ func (b *Bytes) UnmarshalBinary(p []byte) error {
 	b.Data = p
 	return nil
 }
+
+// MarshalBinaryTo copies data into 'p', implementing msgp.Extension.MarshalBinaryTo
+func (b *Bytes) MarshalBinaryTo(p []byte) error {
+	copy(p, b.Data)
+	return nil
+}
+
+// parser - msgp
+
+var MsgpackParser Parser = &msgpackParser{}
+
+type msgpackParser struct{}
+type msgpackEncoder struct{}
+type msgpackDecoder struct{ packets chan *Packet }
+
+func (msgpackParser) Encoder() Encoder { return &msgpackEncoder{} }
+func (msgpackParser) Decoder() Decoder { return newMsgpackDecoder(8) }
+
+func (msgpackEncoder) Encode(p *Packet) ([]byte, [][]byte, error) {
+	switch p.Type {
+	case PacketTypeConnect, PacketTypeDisconnect, PacketTypeError:
+		b, err := json.Marshal(p)
+		return b, nil, err
+	default:
+	}
+	o, err := p.MarshalMsg(nil)
+	return nil, [][]byte{o}, err
+}
+
+func newMsgpackDecoder(size int) *msgpackDecoder {
+	return &msgpackDecoder{packets: make(chan *Packet, size)}
+}
+
+func (m *msgpackDecoder) Add(msgType MessageType, data []byte) (err error) {
+	var p Packet
+	switch msgType {
+	case MessageTypeString:
+		err = json.Unmarshal(data, &p)
+	case MessageTypeBinary:
+		_, err = p.UnmarshalMsg(data)
+	}
+	if err != nil {
+		return err
+	}
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
+		if d, ok := p.Data.([]interface{}); ok {
+			var args []interface{}
+			for i := range d {
+				if raw, ok := d[i].(*msgp.RawExtension); ok {
+					p.buffer = append(p.buffer, raw.Data)
+				} else {
+					args = append(args, d[i])
+				}
+			}
+			if len(args) > 0 {
+				p.event = &eventArgs{}
+				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
+					if evt, ok := args[0].(string); ok {
+						p.event.name = evt
+					} else {
+						return fmt.Errorf("first argument should be event name but got %T", args[0])
+					}
+					args = args[1:]
+				}
+				p.event.data, err = json.Marshal(args)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			return fmt.Errorf("packet data should be an array but got %T", p.Data)
+		}
+	default:
+	}
+	if p.Namespace == "" {
+		p.Namespace = "/"
+	}
+	m.packets <- &p
+	return nil
+}
+
+func (m *msgpackDecoder) Decoded() <-chan *Packet { return m.packets }
