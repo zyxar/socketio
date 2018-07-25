@@ -4,7 +4,7 @@
 
 [![GoDoc](https://godoc.org/github.com/zyxar/socketio?status.svg)](https://godoc.org/github.com/zyxar/socketio)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyxar/socketio)](https://goreportcard.com/report/github.com/zyxar/socketio)
-[![license](https://img.shields.io/badge/license-New%20BSD-red.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
+[![license](https://img.shields.io/badge/license-New%20BSD-ff69b4.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
 [![Build Status](https://travis-ci.org/zyxar/socketio.svg?branch=master)](https://travis-ci.org/zyxar/socketio)
 
 
@@ -23,6 +23,7 @@ vgo get -v -u github.com/zyxar/socketio
 - `engine.io` client (`websocket` only);
 - binary data;
 - limited namespace support;
+- [socket.io-msgpack-parser](https://github.com/darrachequesne/socket.io-msgpack-parser) support;
 
 
 ## Example
@@ -213,3 +214,5 @@ ditto.emit('disguise', 'pidgey', new ArrayBuffer(8));
 The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible with [`socket.io-parser`](https://github.com/socketio/socket.io-parser/), complying with revision 4 of [socket.io-protocol](https://github.com/socketio/socket.io-protocol).
 
 An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface (e.g. `socketio.Bytes`) would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
+
+`socketio.MsgpackParser`, compatible with [socket.io-msgpack-parser](https://github.com/darrachequesne/socket.io-msgpack-parser), is an alternative custom parser.

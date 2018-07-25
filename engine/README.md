@@ -1,7 +1,7 @@
 # engine
 
 [![GoDoc](https://godoc.org/github.com/zyxar/socketio/engine?status.svg)](https://godoc.org/github.com/zyxar/socketio/engine)
-[![license](https://img.shields.io/badge/license-New%20BSD-red.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
+[![license](https://img.shields.io/badge/license-New%20BSD-ff69b4.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
 
 [engine.io](https://github.com/socketio/engine.io) in #Go
 
