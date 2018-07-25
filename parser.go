@@ -39,6 +39,7 @@ type Encoder interface {
 type Decoder interface {
 	Add(msgType MessageType, data []byte) error
 	Decoded() <-chan *Packet
+	ParseData(p *Packet) (string, []byte, [][]byte, error)
 }
 
 // Parser provides Encoder and Decoder instance, like a factory
@@ -138,6 +139,13 @@ func newDefaultDecoder() *defaultDecoder {
 	return &defaultDecoder{
 		packets: make(chan *Packet, 8),
 	}
+}
+
+func (defaultDecoder) ParseData(p *Packet) (string, []byte, [][]byte, error) {
+	if p.event == nil {
+		return "", nil, nil, nil
+	}
+	return p.event.name, p.event.data, p.buffer, nil
 }
 
 func (d *defaultDecoder) Decoded() <-chan *Packet {
@@ -369,6 +377,40 @@ func newMsgpackDecoder(size int) *msgpackDecoder {
 	return &msgpackDecoder{packets: make(chan *Packet, size)}
 }
 
+func (msgpackDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
+		if d, ok := p.Data.([]interface{}); ok {
+			var args []interface{}
+			for i := range d {
+				if raw, ok := d[i].(*msgp.RawExtension); ok {
+					bin = append(bin, raw.Data)
+				} else {
+					args = append(args, d[i])
+				}
+			}
+			if len(args) > 0 {
+				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
+					if evt, ok := args[0].(string); ok {
+						event = evt
+					} else {
+						err = fmt.Errorf("first argument should be event name but got %T", args[0])
+						return
+					}
+					args = args[1:]
+				}
+				data, err = json.Marshal(args)
+				return
+			}
+		} else {
+			err = fmt.Errorf("packet data should be an array but got %T", p.Data)
+			return
+		}
+	default:
+	}
+	return
+}
+
 func (m *msgpackDecoder) Add(msgType MessageType, data []byte) (err error) {
 	var p Packet
 	switch msgType {
@@ -379,37 +421,6 @@ func (m *msgpackDecoder) Add(msgType MessageType, data []byte) (err error) {
 	}
 	if err != nil {
 		return err
-	}
-	switch p.Type {
-	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
-		if d, ok := p.Data.([]interface{}); ok {
-			var args []interface{}
-			for i := range d {
-				if raw, ok := d[i].(*msgp.RawExtension); ok {
-					p.buffer = append(p.buffer, raw.Data)
-				} else {
-					args = append(args, d[i])
-				}
-			}
-			if len(args) > 0 {
-				p.event = &eventArgs{}
-				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
-					if evt, ok := args[0].(string); ok {
-						p.event.name = evt
-					} else {
-						return fmt.Errorf("first argument should be event name but got %T", args[0])
-					}
-					args = args[1:]
-				}
-				p.event.data, err = json.Marshal(args)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			return fmt.Errorf("packet data should be an array but got %T", p.Data)
-		}
-	default:
 	}
 	if p.Namespace == "" {
 		p.Namespace = "/"
