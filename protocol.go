@@ -23,21 +23,21 @@ const ( // PacketType enums
 func (p PacketType) String() string {
 	switch p {
 	case PacketTypeConnect:
-		return "Packet#CONNECT (0)"
+		return "CONNECT"
 	case PacketTypeDisconnect:
-		return "Packet#DISCONNECT (1)"
+		return "DISCONNECT"
 	case PacketTypeEvent:
-		return "Packet#EVENT (2)"
+		return "EVENT"
 	case PacketTypeAck:
-		return "Packet#ACK (3)"
+		return "ACK"
 	case PacketTypeError:
-		return "Packet#ERROR (4)"
+		return "ERROR"
 	case PacketTypeBinaryEvent:
-		return "Packet#BINARY_EVENT (5)"
+		return "BINARY_EVENT"
 	case PacketTypeBinaryAck:
-		return "Packet#BINARY_ACK (6)"
+		return "BINARY_ACK"
 	}
-	return "Packet#INVALID"
+	return "INVALID"
 }
 
 // Packet is message abstraction, representing for data exchanged between socket.io server and client
@@ -47,7 +47,7 @@ type Packet struct {
 	Data      interface{} `msg:"data" json:"data,omitempty"`
 	ID        *uint64     `msg:"id" json:"id,omitempty"`
 
-	event       *eventArgs `msg:"-" json:"-"`
-	attachments int        `msg:"-" json:"-"`
-	buffer      [][]byte   `msg:"-" json:"-"`
+	event       *eventArgs
+	attachments int
+	buffer      [][]byte
 }

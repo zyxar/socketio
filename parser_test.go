@@ -3,6 +3,8 @@ package socketio
 import (
 	"bytes"
 	"testing"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 func TestParserEncodeDecodeString(t *testing.T) {
@@ -141,5 +143,34 @@ func TestParserEncodeBinary(t *testing.T) {
 		if !bytes.Equal(e, b[i]) {
 			t.Error("encoded binary incorrect")
 		}
+	}
+}
+
+func TestMsgpackParseData(t *testing.T) {
+	p := &Packet{Type: PacketTypeEvent, Data: []interface{}{"event"}}
+	b, err := p.MarshalMsg(nil)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	_, err = p.UnmarshalMsg(b)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	event, data, _, err := (msgpackDecoder{}).ParseData(p)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if event != "event" {
+		t.Error("event name incorrect")
+	}
+	_, o, err := msgp.ReadIntfBytes(data)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	if len(o) != 0 {
+		t.Errorf("reconstruction data incorrect: remains %d bytes", len(o))
 	}
 }

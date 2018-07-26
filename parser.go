@@ -379,35 +379,46 @@ func newMsgpackDecoder(size int) *msgpackDecoder {
 
 func (msgpackDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
 	switch p.Type {
-	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
-		if d, ok := p.Data.([]interface{}); ok {
-			var args []interface{}
-			for i := range d {
-				if raw, ok := d[i].(*msgp.RawExtension); ok {
-					bin = append(bin, raw.Data)
-				} else {
-					args = append(args, d[i])
-				}
-			}
-			if len(args) > 0 {
-				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
-					if evt, ok := args[0].(string); ok {
-						event = evt
-					} else {
-						err = fmt.Errorf("first argument should be event name but got %T", args[0])
-						return
-					}
-					args = args[1:]
-				}
-				data, err = json.Marshal(args)
-				return
-			}
-		} else {
-			err = fmt.Errorf("packet data should be an array but got %T", p.Data)
-			return
-		}
+	case PacketTypeConnect, PacketTypeDisconnect, PacketTypeError:
+		return
 	default:
 	}
+
+	b, ok := p.Data.([]byte)
+	if !ok {
+		err = fmt.Errorf("data should be raw bytes but got %T", p.Data)
+		return
+	}
+	if t := msgp.NextType(b); t != msgp.ArrayType {
+		err = fmt.Errorf("data should be a list of arguments but got %v", t)
+		return
+	}
+	data = b
+	var sz uint32
+	sz, b, err = msgp.ReadArrayHeaderBytes(b)
+	if err != nil {
+		return
+	}
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeBinaryEvent:
+		{
+			if t := msgp.NextType(b); t != msgp.StrType {
+				err = fmt.Errorf("event name should have string type but got %v", t)
+				return
+			}
+			event, b, err = msgp.ReadStringBytes(b)
+			if err != nil {
+				return
+			}
+			// reconstruct array
+
+			data = make([]byte, 0, len(b))
+			data = msgp.AppendArrayHeader(data, sz-1)
+			data = append(data, b...)
+		}
+	case PacketTypeAck, PacketTypeBinaryAck:
+	}
+
 	return
 }
 

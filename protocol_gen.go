@@ -39,9 +39,13 @@ func (z *Packet) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "data":
-			z.Data, err = dc.ReadIntf()
-			if err != nil {
-				return
+			{
+				var data msgp.Raw
+				err = data.DecodeMsg(dc)
+				if err != nil {
+					return
+				}
+				z.Data = []byte(data)
 			}
 		case "id":
 			if dc.IsNil() {
@@ -175,9 +179,13 @@ func (z *Packet) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "data":
-			z.Data, bts, err = msgp.ReadIntfBytes(bts)
-			if err != nil {
-				return
+			{
+				var data msgp.Raw
+				bts, err = data.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+				z.Data = []byte(data)
 			}
 		case "id":
 			if msgp.IsNil(bts) {
@@ -214,54 +222,5 @@ func (z *Packet) Msgsize() (s int) {
 	} else {
 		s += msgp.Uint64Size
 	}
-	return
-}
-
-// DecodeMsg implements msgp.Decodable
-func (z *PacketType) DecodeMsg(dc *msgp.Reader) (err error) {
-	{
-		var zb0001 byte
-		zb0001, err = dc.ReadByte()
-		if err != nil {
-			return
-		}
-		(*z) = PacketType(zb0001)
-	}
-	return
-}
-
-// EncodeMsg implements msgp.Encodable
-func (z PacketType) EncodeMsg(en *msgp.Writer) (err error) {
-	err = en.WriteByte(byte(z))
-	if err != nil {
-		return
-	}
-	return
-}
-
-// MarshalMsg implements msgp.Marshaler
-func (z PacketType) MarshalMsg(b []byte) (o []byte, err error) {
-	o = msgp.Require(b, z.Msgsize())
-	o = msgp.AppendByte(o, byte(z))
-	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *PacketType) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	{
-		var zb0001 byte
-		zb0001, bts, err = msgp.ReadByteBytes(bts)
-		if err != nil {
-			return
-		}
-		(*z) = PacketType(zb0001)
-	}
-	o = bts
-	return
-}
-
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z PacketType) Msgsize() (s int) {
-	s = msgp.ByteSize
 	return
 }
