@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"strconv"
 
@@ -19,11 +20,6 @@ var (
 	// ErrUnknownPacket indicates packet invalid or unknown when parser encoding/decoding data
 	ErrUnknownPacket = errors.New("unknown packet")
 )
-
-type eventArgs struct {
-	name string
-	data []byte
-}
 
 type üWriter interface {
 	io.Writer
@@ -40,6 +36,11 @@ type Decoder interface {
 	Add(msgType MessageType, data []byte) error
 	Decoded() <-chan *Packet
 	ParseData(p *Packet) (string, []byte, [][]byte, error)
+	ArgsUnmarshaler
+}
+
+type ArgsUnmarshaler interface {
+	UnmarshalArgs([]reflect.Type, []byte, [][]byte) ([]reflect.Value, error)
 }
 
 // Parser provides Encoder and Decoder instance, like a factory
@@ -141,11 +142,59 @@ func newDefaultDecoder() *defaultDecoder {
 	}
 }
 
-func (defaultDecoder) ParseData(p *Packet) (string, []byte, [][]byte, error) {
-	if p.event == nil {
-		return "", nil, nil, nil
+func (defaultDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
+	text, ok := p.Data.([]byte)
+	if !ok {
+		err = fmt.Errorf("data should be bytes but got %T", p.Data)
+		return
 	}
-	return p.event.name, p.event.data, p.buffer, nil
+	switch p.Type {
+	case PacketTypeBinaryEvent:
+		bin = p.buffer
+		fallthrough
+	case PacketTypeEvent:
+		var match bool
+		if event, data, match = extractEvent(text); !match {
+			err = ErrUnknownPacket
+		}
+	case PacketTypeBinaryAck:
+		bin = p.buffer
+		data = text
+	case PacketTypeAck:
+		data = text
+	}
+	return
+}
+
+func (defaultDecoder) UnmarshalArgs(args []reflect.Type, data []byte, buffer [][]byte) ([]reflect.Value, error) {
+	argv := make([]interface{}, 0, len(args))
+	in := make([]reflect.Value, len(args))
+	for i, typ := range args {
+		if typ.Kind() == reflect.Ptr {
+			typ = typ.Elem()
+		}
+		in[i] = reflect.New(typ)
+		it := in[i].Interface()
+		if b, ok := it.(encoding.BinaryUnmarshaler); ok {
+			if len(buffer) > 0 {
+				if err := b.UnmarshalBinary(buffer[0]); err != nil {
+					return nil, err
+				}
+				buffer = buffer[1:]
+			}
+		} else {
+			argv = append(argv, it)
+		}
+	}
+	if err := json.Unmarshal(data, &argv); err != nil {
+		return nil, err
+	}
+	for i := range args {
+		if args[i].Kind() != reflect.Ptr {
+			in[i] = in[i].Elem()
+		}
+	}
+	return in, nil
 }
 
 func (d *defaultDecoder) Decoded() <-chan *Packet {
@@ -248,31 +297,25 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 		}
 	}
 
-	if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent { // extracts event but leaves data
-		if s[i] == '[' {
-			text := s[i:]
-			if p.Type == PacketTypeBinaryEvent {
-				p.buffer, text = extractAttachments(text)
-			}
-			event, left, match := extractEvent(text)
-			if !match {
-				return nil, ErrUnknownPacket
-			}
-			p.event = &eventArgs{name: event, data: left}
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeAck:
+		if s[i] != '[' {
+			err = fmt.Errorf("data should be a list of arguments but got %c", s[i])
+			return
 		}
-		return p, nil
-	} else if p.Type == PacketTypeAck || p.Type == PacketTypeBinaryAck {
-		text := s[i:]
-		if s[i] == '[' {
-			if p.Type == PacketTypeBinaryAck {
-				p.buffer, text = extractAttachments(text)
-			}
+		p.Data = s[i:]
+	case PacketTypeBinaryAck, PacketTypeBinaryEvent:
+		if s[i] != '[' {
+			err = fmt.Errorf("data should be a list of arguments but got %c", s[i])
+			return
 		}
-		p.event = &eventArgs{data: text}
-		return p, nil
+		p.Data = s[i:]
+		p.buffer, p.Data = extractAttachments(s[i:])
+	default:
+		err = json.Unmarshal(s[i:], &p.Data)
 	}
 
-	return p, json.Unmarshal(s[i:], &p.Data)
+	return
 }
 
 func newid(id uint64) *uint64 {
@@ -377,37 +420,190 @@ func newMsgpackDecoder(size int) *msgpackDecoder {
 	return &msgpackDecoder{packets: make(chan *Packet, size)}
 }
 
-func (msgpackDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
-	switch p.Type {
-	case PacketTypeEvent, PacketTypeAck, PacketTypeBinaryEvent, PacketTypeBinaryAck:
-		if d, ok := p.Data.([]interface{}); ok {
-			var args []interface{}
-			for i := range d {
-				if raw, ok := d[i].(*msgp.RawExtension); ok {
-					bin = append(bin, raw.Data)
-				} else {
-					args = append(args, d[i])
-				}
-			}
-			if len(args) > 0 {
-				if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent {
-					if evt, ok := args[0].(string); ok {
-						event = evt
-					} else {
-						err = fmt.Errorf("first argument should be event name but got %T", args[0])
-						return
-					}
-					args = args[1:]
-				}
-				data, err = json.Marshal(args)
+func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte) (in []reflect.Value, err error) {
+	var sz uint32
+	sz, data, err = msgp.ReadArrayHeaderBytes(data)
+	if err != nil {
+		return
+	}
+	if len(args) > int(sz) {
+		err = fmt.Errorf("not enough data to init %d arguments but only %d data", len(args), sz)
+		return
+	}
+
+	in = make([]reflect.Value, len(args))
+	for i, typ := range args {
+		if typ.Kind() == reflect.Ptr {
+			typ = typ.Elem()
+		}
+		in[i] = reflect.New(typ)
+		switch t := in[i].Interface().(type) {
+		case msgp.Unmarshaler:
+			data, err = t.UnmarshalMsg(data)
+			if err != nil {
 				return
 			}
-		} else {
-			err = fmt.Errorf("packet data should be an array but got %T", p.Data)
-			return
+			v := reflect.ValueOf(t)
+			if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+				v = v.Elem()
+			}
+			in[i].Elem().Set(v)
+		case *bool:
+			*t, data, err = msgp.ReadBoolBytes(data)
+			if err != nil {
+				return
+			}
+		case *float32:
+			*t, data, err = msgp.ReadFloat32Bytes(data)
+			if err != nil {
+				return
+			}
+		case *float64:
+			*t, data, err = msgp.ReadFloat64Bytes(data)
+			if err != nil {
+				return
+			}
+		case *complex64:
+			*t, data, err = msgp.ReadComplex64Bytes(data)
+			if err != nil {
+				return
+			}
+		case *complex128:
+			*t, data, err = msgp.ReadComplex128Bytes(data)
+			if err != nil {
+				return
+			}
+		case *uint8:
+			*t, data, err = msgp.ReadUint8Bytes(data)
+			if err != nil {
+				return
+			}
+		case *uint16:
+			*t, data, err = msgp.ReadUint16Bytes(data)
+			if err != nil {
+				return
+			}
+		case *uint32:
+			*t, data, err = msgp.ReadUint32Bytes(data)
+			if err != nil {
+				return
+			}
+		case *uint64:
+			*t, data, err = msgp.ReadUint64Bytes(data)
+			if err != nil {
+				return
+			}
+		case *uint:
+			*t, data, err = msgp.ReadUintBytes(data)
+			if err != nil {
+				return
+			}
+		case *int8:
+			*t, data, err = msgp.ReadInt8Bytes(data)
+			if err != nil {
+				return
+			}
+		case *int16:
+			*t, data, err = msgp.ReadInt16Bytes(data)
+			if err != nil {
+				return
+			}
+		case *int32:
+			*t, data, err = msgp.ReadInt32Bytes(data)
+			if err != nil {
+				return
+			}
+		case *int64:
+			*t, data, err = msgp.ReadInt64Bytes(data)
+			if err != nil {
+				return
+			}
+		case *int:
+			*t, data, err = msgp.ReadIntBytes(data)
+			if err != nil {
+				return
+			}
+		case *string:
+			*t, data, err = msgp.ReadStringBytes(data)
+			if err != nil {
+				return
+			}
+		case *[]byte:
+			*t, data, err = msgp.ReadBytesZC(data)
+			if err != nil {
+				return
+			}
+		case *map[string]interface{}:
+			*t, data, err = msgp.ReadMapStrIntfBytes(data, nil)
+			if err != nil {
+				return
+			}
+		case *interface{}:
+			*t, data, err = msgp.ReadIntfBytes(data)
+			if err != nil {
+				return
+			}
+		default:
+			t, data, err = msgp.ReadIntfBytes(data)
+			if err != nil {
+				return
+			}
+			v := reflect.ValueOf(t)
+			if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+				v = v.Elem()
+			}
+			in[i].Elem().Set(v)
 		}
+
+		if args[i].Kind() != reflect.Ptr {
+			in[i] = in[i].Elem()
+		}
+	}
+
+	return in, nil
+}
+
+func (msgpackDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
+	switch p.Type {
+	case PacketTypeConnect, PacketTypeDisconnect, PacketTypeError:
+		return
 	default:
 	}
+
+	b, ok := p.Data.([]byte)
+	if !ok {
+		err = fmt.Errorf("data should be raw bytes but got %T", p.Data)
+		return
+	}
+	if t := msgp.NextType(b); t != msgp.ArrayType {
+		err = fmt.Errorf("data should be a list of arguments but got %v", t)
+		return
+	}
+	data = b
+	var sz uint32
+	sz, b, err = msgp.ReadArrayHeaderBytes(b)
+	if err != nil {
+		return
+	}
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeBinaryEvent:
+		{
+			if t := msgp.NextType(b); t != msgp.StrType {
+				err = fmt.Errorf("event name should have string type but got %v", t)
+				return
+			}
+			event, b, err = msgp.ReadStringBytes(b)
+			if err != nil {
+				return
+			}
+			// reconstruct array
+			data = make([]byte, 0, len(b))
+			data = msgp.AppendArrayHeader(data, sz-1)
+			data = append(data, b...)
+		}
+	case PacketTypeAck, PacketTypeBinaryAck:
+	}
+
 	return
 }
 

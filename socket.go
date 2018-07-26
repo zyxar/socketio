@@ -144,7 +144,7 @@ func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error)
 	}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
-			p.ID = newid(namespace.store(args[i]))
+			p.ID = newid(namespace.onAck(args[i]))
 		} else {
 			data = append(data, args[i])
 		}
@@ -184,7 +184,7 @@ func (s *socket) emitPacket(p *Packet) (err error) {
 }
 
 func (s *socket) On(nsp string, event string, callback interface{}) {
-	s.creatensp(nsp).On(event, callback)
+	s.creatensp(nsp).onEvent(event, callback)
 }
 
 func (s *socket) yield() *Packet {
