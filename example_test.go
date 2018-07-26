@@ -81,7 +81,9 @@ func ExampleServer() {
 		}()
 		return so.Emit("/", "event", "hello world!")
 	})
-
+	server.OnError(func(so socketio.Socket, err error) {
+		log.Printf("%v error=> %v", so.RemoteAddr(), err)
+	})
 	defer server.Close()
 	log.Fatalln(http.ListenAndServe("localhost:8081", server))
 }

@@ -21,11 +21,6 @@ var (
 	ErrUnknownPacket = errors.New("unknown packet")
 )
 
-type eventArgs struct {
-	name string
-	data []byte
-}
-
 type üWriter interface {
 	io.Writer
 	io.ByteWriter
@@ -147,11 +142,28 @@ func newDefaultDecoder() *defaultDecoder {
 	}
 }
 
-func (defaultDecoder) ParseData(p *Packet) (string, []byte, [][]byte, error) {
-	if p.event == nil {
-		return "", nil, nil, nil
+func (defaultDecoder) ParseData(p *Packet) (event string, data []byte, bin [][]byte, err error) {
+	text, ok := p.Data.([]byte)
+	if !ok {
+		err = fmt.Errorf("data should be bytes but got %T", p.Data)
+		return
 	}
-	return p.event.name, p.event.data, p.buffer, nil
+	switch p.Type {
+	case PacketTypeBinaryEvent:
+		bin = p.buffer
+		fallthrough
+	case PacketTypeEvent:
+		var match bool
+		if event, data, match = extractEvent(text); !match {
+			err = ErrUnknownPacket
+		}
+	case PacketTypeBinaryAck:
+		bin = p.buffer
+		data = text
+	case PacketTypeAck:
+		data = text
+	}
+	return
 }
 
 func (defaultDecoder) UnmarshalArgs(args []reflect.Type, data []byte, buffer [][]byte) ([]reflect.Value, error) {
@@ -285,31 +297,25 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 		}
 	}
 
-	if p.Type == PacketTypeEvent || p.Type == PacketTypeBinaryEvent { // extracts event but leaves data
-		if s[i] == '[' {
-			text := s[i:]
-			if p.Type == PacketTypeBinaryEvent {
-				p.buffer, text = extractAttachments(text)
-			}
-			event, left, match := extractEvent(text)
-			if !match {
-				return nil, ErrUnknownPacket
-			}
-			p.event = &eventArgs{name: event, data: left}
+	switch p.Type {
+	case PacketTypeEvent, PacketTypeAck:
+		if s[i] != '[' {
+			err = fmt.Errorf("data should be a list of arguments but got %c", s[i])
+			return
 		}
-		return p, nil
-	} else if p.Type == PacketTypeAck || p.Type == PacketTypeBinaryAck {
-		text := s[i:]
-		if s[i] == '[' {
-			if p.Type == PacketTypeBinaryAck {
-				p.buffer, text = extractAttachments(text)
-			}
+		p.Data = s[i:]
+	case PacketTypeBinaryAck, PacketTypeBinaryEvent:
+		if s[i] != '[' {
+			err = fmt.Errorf("data should be a list of arguments but got %c", s[i])
+			return
 		}
-		p.event = &eventArgs{data: text}
-		return p, nil
+		p.Data = s[i:]
+		p.buffer, p.Data = extractAttachments(s[i:])
+	default:
+		err = json.Unmarshal(s[i:], &p.Data)
 	}
 
-	return p, json.Unmarshal(s[i:], &p.Data)
+	return
 }
 
 func newid(id uint64) *uint64 {

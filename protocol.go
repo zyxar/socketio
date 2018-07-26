@@ -47,7 +47,6 @@ type Packet struct {
 	Data      interface{} `msg:"data" json:"data,omitempty"`
 	ID        *uint64     `msg:"id" json:"id,omitempty"`
 
-	event       *eventArgs
 	attachments int
 	buffer      [][]byte
 }

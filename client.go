@@ -83,33 +83,50 @@ func (c *Client) process(sock *socket, p *Packet) {
 			sock.onDisconnect(p.Namespace)
 		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
-		if p.event != nil {
-			v, err := nsp.fireEvent(p.event.name, p.event.data, p.buffer, sock.decoder)
-			if err != nil {
+
+		event, data, bin, err := sock.decoder.ParseData(p)
+		if err != nil {
+			if sock.onError != nil {
+				sock.onError(p.Namespace, err)
+			}
+			return
+		}
+		if event == "" {
+			return
+		}
+		v, err := nsp.fireEvent(event, data, bin, sock.decoder)
+		if err != nil {
+			if c.onError != nil {
+				c.onError(err)
+			}
+			return
+		}
+		if p.ID != nil {
+			p.Data = nil
+			if v != nil {
+				d := make([]interface{}, len(v))
+				for i := range d {
+					d[i] = v[i].Interface()
+				}
+				p.Data = d
+			}
+			if err = sock.ack(p); err != nil {
 				if c.onError != nil {
 					c.onError(err)
 				}
-				return
-			}
-			if p.ID != nil {
-				p.Data = nil
-				if v != nil {
-					d := make([]interface{}, len(v))
-					for i := range d {
-						d[i] = v[i].Interface()
-					}
-					p.Data = d
-				}
-				if err = sock.ack(p); err != nil {
-					if c.onError != nil {
-						c.onError(err)
-					}
-				}
 			}
 		}
+
 	case PacketTypeAck, PacketTypeBinaryAck:
-		if p.ID != nil && p.event != nil {
-			nsp.fireAck(*p.ID, p.event.data, p.buffer, sock.decoder)
+		if p.ID != nil {
+			_, data, bin, err := sock.decoder.ParseData(p)
+			if err != nil {
+				if sock.onError != nil {
+					sock.onError(p.Namespace, err)
+				}
+				return
+			}
+			nsp.fireAck(*p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
 		if c.onError != nil {
