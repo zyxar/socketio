@@ -84,7 +84,7 @@ func (c *Client) process(sock *socket, p *Packet) {
 		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		if p.event != nil {
-			v, err := nsp.fire(p.event.name, p.event.data, p.buffer)
+			v, err := nsp.fireEvent(p.event.name, p.event.data, p.buffer, sock.decoder)
 			if err != nil {
 				if c.onError != nil {
 					c.onError(err)
@@ -109,7 +109,7 @@ func (c *Client) process(sock *socket, p *Packet) {
 		}
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil && p.event != nil {
-			nsp.onAck(*p.ID, p.event.data, p.buffer)
+			nsp.fireAck(*p.ID, p.event.data, p.buffer, sock.decoder)
 		}
 	case PacketTypeError:
 		if c.onError != nil {

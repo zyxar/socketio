@@ -100,7 +100,7 @@ func (*Server) process(sock *socket, p *Packet) {
 		if event == "" {
 			return
 		}
-		v, err := nsp.fire(event, data, bin)
+		v, err := nsp.fireEvent(event, data, bin, sock.decoder)
 		if err != nil {
 			if sock.onError != nil {
 				sock.onError(p.Namespace, err)
@@ -132,7 +132,7 @@ func (*Server) process(sock *socket, p *Packet) {
 				}
 				return
 			}
-			nsp.onAck(*p.ID, data, bin)
+			nsp.fireAck(*p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
 		if sock.onError != nil {

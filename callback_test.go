@@ -22,7 +22,7 @@ func TestHandleFn(t *testing.T) {
 			t.Error("object")
 		}
 	})
-	_, err := fn.Call([]byte(`["message","WFhZWQ==",{"n":"hello","v":"world"}]`), nil)
+	_, err := fn.Call(defaultDecoder{}, []byte(`["message","WFhZWQ==",{"n":"hello","v":"world"}]`), nil)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -41,7 +41,7 @@ func TestBufferHandleFn(t *testing.T) {
 			t.Error("handle binary error")
 		}
 	})
-	_, err := fn.Call([]byte(`["message", "c", "d", "e"]`), [][]byte{b1, b2})
+	_, err := fn.Call(defaultDecoder{}, []byte(`["message", "c", "d", "e"]`), [][]byte{b1, b2})
 	if err != nil {
 		t.Error(err.Error())
 	}

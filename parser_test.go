@@ -147,7 +147,7 @@ func TestParserEncodeBinary(t *testing.T) {
 }
 
 func TestMsgpackParseData(t *testing.T) {
-	p := &Packet{Type: PacketTypeEvent, Data: []interface{}{"event"}}
+	p := &Packet{Type: PacketTypeEvent, Data: []interface{}{"event", 1, "data"}}
 	b, err := p.MarshalMsg(nil)
 	if err != nil {
 		t.Error(err.Error())
@@ -173,4 +173,40 @@ func TestMsgpackParseData(t *testing.T) {
 	if len(o) != 0 {
 		t.Errorf("reconstruction data incorrect: remains %d bytes", len(o))
 	}
+}
+
+func TestMsgpackUnmarshalArgs(t *testing.T) {
+	data, err := msgp.AppendIntf(nil, []interface{}{
+		int(100), uint32(200), int64(300), []byte{1, 2, 3, 4}, "string",
+		complex64(400), &msgp.RawExtension{Type: 99, Data: []byte{1, 0, 1, 0, 1}}, map[string]interface{}{"a": "value"},
+	})
+
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	ff := newHandleFn(func(i int, j uint32, k int64, b []byte, s string, c complex64, e msgp.RawExtension, m map[string]interface{}) {
+		if i != 100 || j != 200 || k != 300 || !bytes.Equal(b, []byte{1, 2, 3, 4}) || s != "string" || c != complex64(400) {
+			t.Error("arguments incorrect")
+		}
+
+		if v, ok := m["a"]; !ok {
+			t.Error("argument: map incorrect")
+		} else if ss, ok := v.(string); !ok {
+			t.Error("argument: map value type incorrect")
+		} else if ss != "value" {
+			t.Error("argument: map value incorrect")
+		}
+
+		if e.Type != 99 || !bytes.Equal(e.Data, []byte{1, 0, 1, 0, 1}) {
+			t.Error("argument: extension incorrect")
+		}
+	})
+
+	in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	ff.fn.Call(in)
 }
