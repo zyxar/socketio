@@ -8,6 +8,17 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
+// Packet is message abstraction, representing for data exchanged between socket.io server and client
+type Packet struct {
+	Type      PacketType  `msg:"type" json:"type"`
+	Namespace string      `msg:"nsp" json:"nsp"`
+	Data      interface{} `msg:"data" json:"data,omitempty"`
+	ID        *uint64     `msg:"id" json:"id,omitempty"`
+
+	attachments int
+	buffer      [][]byte
+}
+
 // DecodeMsg implements msgp.Decodable
 func (z *Packet) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte

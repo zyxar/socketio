@@ -1,5 +1,3 @@
-//go:generate msgp -tests=false
-
 package socketio
 
 const (
@@ -38,15 +36,4 @@ func (p PacketType) String() string {
 		return "BINARY_ACK"
 	}
 	return "INVALID"
-}
-
-// Packet is message abstraction, representing for data exchanged between socket.io server and client
-type Packet struct {
-	Type      PacketType  `msg:"type" json:"type"`
-	Namespace string      `msg:"nsp" json:"nsp"`
-	Data      interface{} `msg:"data" json:"data,omitempty"`
-	ID        *uint64     `msg:"id" json:"id,omitempty"`
-
-	attachments int
-	buffer      [][]byte
 }
