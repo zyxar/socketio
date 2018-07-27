@@ -216,3 +216,38 @@ The `encoder` and `decoder` provided by `socketio.DefaultParser` is compatible w
 An `Event` or `Ack` Packet with any data satisfying `socketio.Binary` interface (e.g. `socketio.Bytes`) would be encoded as `BinaryEvent` or `BinaryAck` Packet respectively.
 
 `socketio.MsgpackParser`, compatible with [socket.io-msgpack-parser](https://github.com/darrachequesne/socket.io-msgpack-parser), is an alternative custom parser.
+
+
+## nginx as Reverse Proxy (or TLS Terminator)
+
+```
+upstream socketio {
+    ip_hash;
+    server localhost:8080;
+}
+
+server {
+
+    # ...
+
+    location /socket.io/ {
+        if ($request_method = OPTIONS) {
+                add_header Content-Length 0;
+                add_header Content-Type text/plain;
+                add_header Access-Control-Allow-Origin "$http_origin" always;
+                add_header Access-Control-Allow-Credentials 'true' always;
+                add_header Access-Control-Allow-Methods "POST,GET,OPTIONS";
+                add_header Access-Control-Allow-Headers "content-type";
+                return 204;
+        }
+        proxy_pass http://socketio;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        add_header Access-Control-Allow-Origin "$http_origin" always;
+        add_header Access-Control-Allow-Credentials 'true' always;
+    }
+}
+
+```
