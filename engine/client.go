@@ -49,13 +49,14 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	}
 
 	go func() {
+		var err error
 		for {
 			select {
 			case <-closeChan:
 				return
 			case <-time.After(pingInterval):
 			}
-			if err = c.Ping(); err != nil {
+			if err = ß.Emit(EventPing, MessageTypeString, nil); err != nil {
 				println(err.Error())
 				return
 			}
@@ -99,11 +100,6 @@ func (c *Client) handle(ß *Socket, p *Packet) (err error) {
 		return ErrInvalidPayload
 	}
 	return
-}
-
-// Ping emits a PING packet to server
-func (c *Client) Ping() error {
-	return c.Emit(EventPing, MessageTypeString, nil)
 }
 
 // Close closes underlying connection and signals stop for background workers
