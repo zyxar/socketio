@@ -177,17 +177,22 @@ func TestMsgpackParseData(t *testing.T) {
 
 func TestMsgpackUnmarshalArgs(t *testing.T) {
 	data, err := msgp.AppendIntf(nil, []interface{}{
-		int(100), uint32(200), int64(300), []byte{1, 2, 3, 4}, "string",
-		complex64(400), &msgp.RawExtension{Type: 99, Data: []byte{1, 0, 1, 0, 1}}, map[string]interface{}{"a": "value"},
+		int(100), uint32(200), int64(300), []byte{1, 2, 3, 4}, "string", &foobar{Foo: "bar"},
+		complex64(400), &msgp.RawExtension{Type: 99, Data: []byte{1, 0, 1, 0, 1}},
+		map[string]interface{}{"a": "value"},
 	})
 
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	ff := newHandleFn(func(i int, j uint32, k int64, b []byte, s string, c complex64, e msgp.RawExtension, m map[string]interface{}) {
+	ff := newHandleFn(func(i int, j uint32, k int64, b []byte, s string, foo foobar, c complex64, e extfoo, m map[string]interface{}) {
 		if i != 100 || j != 200 || k != 300 || !bytes.Equal(b, []byte{1, 2, 3, 4}) || s != "string" || c != complex64(400) {
 			t.Error("arguments incorrect")
+		}
+
+		if foo.Foo != "bar" {
+			t.Error("msgp.Unmarshaler incorrect")
 		}
 
 		if v, ok := m["a"]; !ok {
@@ -198,7 +203,7 @@ func TestMsgpackUnmarshalArgs(t *testing.T) {
 			t.Error("argument: map value incorrect")
 		}
 
-		if e.Type != 99 || !bytes.Equal(e.Data, []byte{1, 0, 1, 0, 1}) {
+		if !bytes.Equal(e.Data, []byte{1, 0, 1, 0, 1}) {
 			t.Error("argument: extension incorrect")
 		}
 	})
@@ -209,4 +214,60 @@ func TestMsgpackUnmarshalArgs(t *testing.T) {
 		return
 	}
 	ff.fn.Call(in)
+}
+
+type extfoo struct{ msgp.RawExtension }
+
+func (extfoo) ExtensionType() int8 { return 99 }
+
+type foobar struct {
+	Foo string `msg:"foo"`
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z foobar) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "foo"
+	o = append(o, 0x81, 0xa3, 0x66, 0x6f, 0x6f)
+	o = msgp.AppendString(o, z.Foo)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *foobar) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "foo":
+			z.Foo, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z foobar) Msgsize() (s int) {
+	s = 1 + 4 + msgp.StringPrefixSize + len(z.Foo)
+	return
 }

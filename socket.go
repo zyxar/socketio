@@ -70,22 +70,9 @@ func (s *socket) attachnsp(nsp string) *nspHandle {
 	if !ok {
 		return nil
 	}
-	s.mutex.RLock()
-	_, ok = s.nspAttr[nsp]
-	s.mutex.RUnlock()
-	if !ok {
-		if err := s.emitPacket(&Packet{
-			Type:      PacketTypeConnect,
-			Namespace: nsp,
-		}); err != nil {
-			if s.onError != nil {
-				s.onError(nsp, err)
-			}
-		}
-		s.mutex.Lock()
-		s.nspAttr[nsp] = struct{}{}
-		s.mutex.Unlock()
-	}
+	s.mutex.Lock()
+	s.nspAttr[nsp] = struct{}{}
+	s.mutex.Unlock()
 	return n
 }
 

@@ -11,7 +11,6 @@ import (
 // Socket is engine.io connection encapsulation
 type Socket struct {
 	Conn
-	*eventHandlers
 	readTimeout   time.Duration
 	writeTimeout  time.Duration
 	transportName string
@@ -24,11 +23,10 @@ type Socket struct {
 
 func newSocket(conn Conn, readTimeout, writeTimeout time.Duration, id string) *Socket {
 	so := &Socket{
-		Conn:          conn,
-		eventHandlers: newEventHandlers(),
-		readTimeout:   readTimeout,
-		writeTimeout:  writeTimeout,
-		id:            id}
+		Conn:         conn,
+		readTimeout:  readTimeout,
+		writeTimeout: writeTimeout,
+		id:           id}
 	emitter := newEmitter(so, 8)
 	go emitter.loop()
 	so.emitter = emitter
@@ -52,101 +50,15 @@ func (s *Socket) resume() {
 	close(s.barrier.Load().(chan struct{}))
 }
 
-func (s *Socket) upgrade(transportName string, newConn Conn) {
-	s.pause()
-	defer s.resume()
-	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
-	p, err := newConn.ReadPacket()
-	if err != nil {
-		newConn.Close()
-		return
-	}
-	if p.pktType != PacketTypePing {
-		newConn.Close()
-		return
-	}
-	p.pktType = PacketTypePong
-	newConn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-	if err = newConn.WritePacket(p); err != nil {
-		newConn.Close()
-		return
-	}
-
-	s.RLock()
-	conn := s.Conn
-	s.RUnlock()
-
-	if err := conn.Pause(); err != nil {
-		newConn.Close()
-		return
-	}
-
-	newConn.SetReadDeadline(time.Now().Add(s.readTimeout))
-	p, err = newConn.ReadPacket()
-	if err != nil {
-		newConn.Close()
-		conn.Resume()
-		return
-	}
-	if p.pktType != PacketTypeUpgrade {
-		newConn.Close()
-		conn.Resume()
-		return
-	}
-
-	conn.Close()
-
-	for _, packet := range conn.FlushOut() {
-		newConn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-		newConn.WritePacket(packet)
-	}
-
-	s.Lock()
-	s.Conn = newConn
-	s.transportName = transportName
-	s.Unlock()
-
-	for _, packet := range conn.FlushIn() {
-		s.handle(packet)
-	}
-
-	s.fire(EventUpgrade, p.msgType, p.data)
-}
-
-// Handle is event handling helper
-func (s *Socket) Handle() (err error) {
+// Read returns a Packet upon success or error on failure
+func (s *Socket) Read() (p *Packet, err error) {
 	s.RLock()
 	conn := s.Conn
 	s.RUnlock()
 	if err = conn.SetReadDeadline(time.Now().Add(s.readTimeout)); err != nil {
 		return
 	}
-	p, err := conn.ReadPacket()
-	if err != nil {
-		return err
-	}
-	return s.handle(p)
-}
-
-func (s *Socket) handle(p *Packet) (err error) {
-	switch p.pktType {
-	case PacketTypeOpen:
-	case PacketTypeClose:
-		s.fire(EventClose, p.msgType, p.data)
-		return s.Close()
-	case PacketTypePing:
-		err = s.Emit(EventPong, p.msgType, p.data)
-		s.fire(EventPing, p.msgType, p.data)
-	case PacketTypePong:
-		s.fire(EventPong, p.msgType, p.data)
-	case PacketTypeMessage:
-		s.fire(EventMessage, p.msgType, p.data)
-	case PacketTypeUpgrade:
-	case PacketTypeNoop:
-		// noop
-	default:
-		return ErrInvalidPayload
-	}
+	p, err = conn.ReadPacket()
 	return
 }
 
