@@ -16,7 +16,7 @@ func newNspHandle(namespace string) *nspHandle {
 		eventHandle: eventHandle{
 			handlers: make(map[string]*handleFn),
 		},
-		ackHandle: ackHandle{},
+		ackHandle: ackHandle{ackmap: make(map[uint64]*handleFn)},
 	}
 }
 
@@ -43,19 +43,27 @@ func (e *eventHandle) fireEvent(event string, args []byte, buffer [][]byte, au A
 
 type ackHandle struct {
 	id     uint64
-	ackmap sync.Map
+	ackmap map[uint64]*handleFn
+	mutex  sync.RWMutex
 }
 
 func (a *ackHandle) fireAck(id uint64, data []byte, buffer [][]byte, au ArgsUnmarshaler) (err error) {
-	if fn, ok := a.ackmap.Load(id); ok {
-		a.ackmap.Delete(id)
-		_, err = fn.(*handleFn).Call(au, data, buffer)
+	a.mutex.RLock()
+	fn, ok := a.ackmap[id]
+	a.mutex.RUnlock()
+	if ok {
+		a.mutex.Lock()
+		delete(a.ackmap, id)
+		a.mutex.Unlock()
+		_, err = fn.Call(au, data, buffer)
 	}
 	return
 }
 
 func (a *ackHandle) onAck(callback interface{}) uint64 {
 	id := atomic.AddUint64(&a.id, 1)
-	a.ackmap.Store(id, newHandleFn(callback))
+	a.mutex.Lock()
+	a.ackmap[id] = newHandleFn(callback)
+	a.mutex.Unlock()
 	return id
 }
