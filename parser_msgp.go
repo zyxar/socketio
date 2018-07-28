@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/tinylib/msgp/msgp"
 )
@@ -53,11 +54,11 @@ func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte
 			if err != nil {
 				return
 			}
-			v := reflect.ValueOf(t)
-			if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
-				v = v.Elem()
+		case msgp.Extension:
+			data, err = msgp.ReadExtensionBytes(data, t)
+			if err != nil {
+				return
 			}
-			in[i].Elem().Set(v)
 		case *bool:
 			*t, data, err = msgp.ReadBoolBytes(data)
 			if err != nil {
@@ -130,6 +131,18 @@ func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte
 			}
 		case *int:
 			*t, data, err = msgp.ReadIntBytes(data)
+			if err != nil {
+				return
+			}
+		case *time.Duration:
+			var vv int64
+			vv, data, err = msgp.ReadInt64Bytes(data)
+			if err != nil {
+				return
+			}
+			*t = time.Duration(vv)
+		case *time.Time:
+			*t, data, err = msgp.ReadTimeBytes(data)
 			if err != nil {
 				return
 			}
