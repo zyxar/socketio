@@ -28,6 +28,14 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 				}
 			}
 		}
+		if err := socket.emitPacket(&Packet{
+			Type:      PacketTypeConnect,
+			Namespace: "/",
+		}); err != nil {
+			if socket.onError != nil {
+				socket.onError("/", err)
+			}
+		}
 		server.sockLock.Lock()
 		server.sockets[ß] = socket
 		server.sockLock.Unlock()
@@ -108,6 +116,14 @@ func (*Server) process(sock *socket, p *Packet) {
 	}
 	switch p.Type {
 	case PacketTypeConnect:
+		if err := sock.emitPacket(&Packet{
+			Type:      PacketTypeConnect,
+			Namespace: p.Namespace,
+		}); err != nil {
+			if sock.onError != nil {
+				sock.onError(p.Namespace, err)
+			}
+		}
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
 	case PacketTypeEvent, PacketTypeBinaryEvent:
