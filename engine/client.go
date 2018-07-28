@@ -10,6 +10,7 @@ import (
 // Client is engine.io client
 type Client struct {
 	*Socket
+	*eventHandlers
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	closeChan    chan struct{}
@@ -38,12 +39,13 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
 	closeChan := make(chan struct{}, 1)
-	so := newSocket(conn, pingTimeout, pingTimeout, param.SID)
+	ß := newSocket(conn, pingTimeout, pingTimeout, param.SID)
 	c = &Client{
-		Socket:       so,
-		pingInterval: pingInterval,
-		pingTimeout:  pingTimeout,
-		closeChan:    closeChan,
+		Socket:        ß,
+		eventHandlers: newEventHandlers(),
+		pingInterval:  pingInterval,
+		pingTimeout:   pingTimeout,
+		closeChan:     closeChan,
 	}
 
 	go func() {
@@ -60,20 +62,42 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 		}
 	}()
 	go func() {
-		defer so.Close()
+		defer ß.Close()
+		var p *Packet
+		var err error
 		for {
 			select {
 			case <-closeChan:
 				return
 			default:
 			}
-			if err := so.Handle(); err != nil {
+			if p, err = ß.Read(); err != nil {
 				println(err.Error())
 				return
+			} else {
+				c.handle(ß, p)
 			}
 		}
 	}()
 
+	return
+}
+
+func (c *Client) handle(ß *Socket, p *Packet) (err error) {
+	switch p.pktType {
+	case PacketTypeOpen:
+	case PacketTypeClose:
+		c.fire(ß, EventClose, p.msgType, p.data)
+		return ß.Close()
+	case PacketTypePing:
+	case PacketTypePong:
+	case PacketTypeMessage:
+		c.fire(ß, EventMessage, p.msgType, p.data)
+	case PacketTypeUpgrade:
+	case PacketTypeNoop:
+	default:
+		return ErrInvalidPayload
+	}
 	return
 }
 

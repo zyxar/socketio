@@ -17,16 +17,16 @@ const (
 )
 
 // Callback is a Callable func, default event handler
-type Callback func(typ MessageType, data []byte)
+type Callback func(so *Socket, typ MessageType, data []byte)
 
 // Callable is event handle to be called when event occurs
 type Callable interface {
-	Call(typ MessageType, data []byte)
+	Call(so *Socket, typ MessageType, data []byte)
 }
 
 // Call implements Callable interface
-func (h Callback) Call(typ MessageType, data []byte) {
-	h(typ, data)
+func (h Callback) Call(so *Socket, typ MessageType, data []byte) {
+	h(so, typ, data)
 }
 
 type eventHandlers struct {
@@ -46,11 +46,11 @@ func (e *eventHandlers) On(event event, callable Callable) {
 	e.Unlock()
 }
 
-func (e *eventHandlers) fire(event event, typ MessageType, data []byte) {
+func (e *eventHandlers) fire(so *Socket, event event, typ MessageType, data []byte) {
 	e.RLock()
 	callable, ok := e.handlers[event]
 	e.RUnlock()
 	if ok {
-		callable.Call(typ, data)
+		callable.Call(so, typ, data)
 	}
 }
