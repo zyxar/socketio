@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/zyxar/socketio/engine"
@@ -10,15 +11,16 @@ import (
 // Server is socket.io server implementation
 type Server struct {
 	engine    *engine.Server
+	sockets   map[*engine.Socket]*socket
+	sockLock  sync.RWMutex
 	onConnect func(so Socket) error
 	onError   func(so Socket, err error)
 }
 
 // NewServer creates a socket.io server instance upon underlying engine.io transport
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
-	e, err := engine.NewServer(interval, timeout, func(so *engine.Socket) {
-		socket := newServerSocket(so, parser)
-
+	e, err := engine.NewServer(interval, timeout, func(ß *engine.Socket) {
+		socket := newServerSocket(ß, parser)
 		if server.onConnect != nil {
 			if err = server.onConnect(socket); err != nil {
 				if server.onError != nil {
@@ -26,33 +28,52 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 				}
 			}
 		}
-
-		so.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
-			switch msgType {
-			case engine.MessageTypeString:
-			case engine.MessageTypeBinary:
-			default:
-				return
-			}
-			if err := socket.decoder.Add(msgType, data); err != nil {
-				if server.onError != nil {
-					server.onError(socket, err)
-				}
-			}
-			if p := socket.yield(); p != nil {
-				server.process(socket, p)
-			}
-		}))
-
-		so.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
-			socket.Close()
-			socket.detachall()
-		}))
+		server.sockLock.Lock()
+		server.sockets[ß] = socket
+		server.sockLock.Unlock()
 	})
 	if err != nil {
 		return
 	}
-	server = &Server{engine: e}
+	server = &Server{engine: e, sockets: make(map[*engine.Socket]*socket)}
+
+	e.On(engine.EventMessage, engine.Callback(func(ß *engine.Socket, msgType engine.MessageType, data []byte) {
+		server.sockLock.RLock()
+		socket := server.sockets[ß]
+		server.sockLock.RUnlock()
+		if socket == nil {
+			return
+		}
+		switch msgType {
+		case engine.MessageTypeString:
+		case engine.MessageTypeBinary:
+		default:
+			return
+		}
+		if err := socket.decoder.Add(msgType, data); err != nil {
+			if server.onError != nil {
+				server.onError(socket, err)
+			}
+		}
+		if p := socket.yield(); p != nil {
+			server.process(socket, p)
+		}
+	}))
+
+	e.On(engine.EventClose, engine.Callback(func(ß *engine.Socket, _ engine.MessageType, _ []byte) {
+		server.sockLock.RLock()
+		socket := server.sockets[ß]
+		server.sockLock.RUnlock()
+		if socket == nil {
+			return
+		}
+		server.sockLock.Lock()
+		delete(server.sockets, ß)
+		server.sockLock.Unlock()
+		socket.Close()
+		socket.detachall()
+	}))
+
 	return
 }
 

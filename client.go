@@ -23,7 +23,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	}
 	socket := newClientSocket(e.Socket, parser)
 	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
-	e.Socket.On(engine.EventMessage, engine.Callback(func(msgType engine.MessageType, data []byte) {
+	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
 		case engine.MessageTypeBinary:
@@ -40,7 +40,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		}
 	}))
 
-	e.Socket.On(engine.EventClose, engine.Callback(func(_ engine.MessageType, _ []byte) {
+	e.On(engine.EventClose, engine.Callback(func(_ *engine.Socket, _ engine.MessageType, _ []byte) {
 		socket.Close()
 		socket.mutex.Lock()
 		for k := range socket.nsp {
