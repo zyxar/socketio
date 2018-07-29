@@ -31,6 +31,139 @@ func newMsgpackDecoder(size int) *msgpackDecoder {
 	return &msgpackDecoder{packets: make(chan *Packet, size)}
 }
 
+func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
+	var err error
+	switch t := i.Interface().(type) {
+	case msgp.Unmarshaler:
+		data, err = t.UnmarshalMsg(data)
+		return data, err
+	case msgp.Extension:
+		data, err = msgp.ReadExtensionBytes(data, t)
+		return data, err
+	case *bool:
+		*t, data, err = msgp.ReadBoolBytes(data)
+		return data, err
+	case *float32:
+		*t, data, err = msgp.ReadFloat32Bytes(data)
+		return data, err
+	case *float64:
+		*t, data, err = msgp.ReadFloat64Bytes(data)
+		return data, err
+	case *complex64:
+		*t, data, err = msgp.ReadComplex64Bytes(data)
+		return data, err
+	case *complex128:
+		*t, data, err = msgp.ReadComplex128Bytes(data)
+		return data, err
+	case *uint8:
+		*t, data, err = msgp.ReadUint8Bytes(data)
+		return data, err
+	case *uint16:
+		*t, data, err = msgp.ReadUint16Bytes(data)
+		return data, err
+	case *uint32:
+		*t, data, err = msgp.ReadUint32Bytes(data)
+		return data, err
+	case *uint64:
+		*t, data, err = msgp.ReadUint64Bytes(data)
+		return data, err
+	case *uint:
+		*t, data, err = msgp.ReadUintBytes(data)
+		return data, err
+	case *int8:
+		*t, data, err = msgp.ReadInt8Bytes(data)
+		return data, err
+	case *int16:
+		*t, data, err = msgp.ReadInt16Bytes(data)
+		return data, err
+	case *int32:
+		*t, data, err = msgp.ReadInt32Bytes(data)
+		return data, err
+	case *int64:
+		*t, data, err = msgp.ReadInt64Bytes(data)
+		return data, err
+	case *int:
+		*t, data, err = msgp.ReadIntBytes(data)
+		return data, err
+	case *time.Duration:
+		var vv int64
+		vv, data, err = msgp.ReadInt64Bytes(data)
+		return data, err
+		*t = time.Duration(vv)
+	case *time.Time:
+		*t, data, err = msgp.ReadTimeBytes(data)
+		return data, err
+	case *string:
+		*t, data, err = msgp.ReadStringBytes(data)
+		return data, err
+	case *[]byte:
+		*t, data, err = msgp.ReadBytesZC(data)
+		return data, err
+	case *map[string]interface{}:
+		*t, data, err = msgp.ReadMapStrIntfBytes(data, nil)
+		return data, err
+	case *interface{}:
+		*t, data, err = msgp.ReadIntfBytes(data)
+		return data, err
+	default:
+	}
+
+	ie := i.Elem()
+	switch ie.Kind() {
+	case reflect.Ptr:
+		vv := reflect.New(ie.Type().Elem())
+		data, err = msgpUnmashalArg(vv, data)
+		if err == nil {
+			ie.Set(vv)
+		}
+		return data, err
+	case reflect.Slice:
+		var sz uint32
+		sz, data, err = msgp.ReadArrayHeaderBytes(data)
+		if err != nil {
+			return data, err
+		}
+		slice := reflect.MakeSlice(ie.Type(), 0, int(sz))
+		for i := 0; i < int(sz); i++ {
+			vv := reflect.New(ie.Type().Elem())
+			data, err = msgpUnmashalArg(vv, data)
+			if err != nil {
+				return data, err
+			}
+			slice = reflect.Append(slice, vv.Elem())
+		}
+		ie.Set(slice)
+		return data, nil
+	case reflect.Array:
+		var sz uint32
+		sz, data, err = msgp.ReadArrayHeaderBytes(data)
+		if err != nil {
+			return data, err
+		}
+		if ie.Len() < int(sz) {
+			return data, fmt.Errorf("%s len is %d, but unmarshaling %d elements", ie.Type(), ie.Len(), sz)
+		}
+		for i := 0; i < int(sz); i++ {
+			data, err = msgpUnmashalArg(ie.Index(i).Addr(), data)
+			if err != nil {
+				return data, err
+			}
+		}
+		return data, nil
+	}
+
+	vv, data, err := msgp.ReadIntfBytes(data)
+	if err != nil {
+		return data, err
+	}
+	v := reflect.ValueOf(vv)
+	if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	ie.Set(v)
+	return data, err
+}
+
 func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte) (in []reflect.Value, err error) {
 	var sz uint32
 	sz, data, err = msgp.ReadArrayHeaderBytes(data)
@@ -48,136 +181,10 @@ func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte
 			typ = typ.Elem()
 		}
 		in[i] = reflect.New(typ)
-		switch t := in[i].Interface().(type) {
-		case msgp.Unmarshaler:
-			data, err = t.UnmarshalMsg(data)
-			if err != nil {
-				return
-			}
-		case msgp.Extension:
-			data, err = msgp.ReadExtensionBytes(data, t)
-			if err != nil {
-				return
-			}
-		case *bool:
-			*t, data, err = msgp.ReadBoolBytes(data)
-			if err != nil {
-				return
-			}
-		case *float32:
-			*t, data, err = msgp.ReadFloat32Bytes(data)
-			if err != nil {
-				return
-			}
-		case *float64:
-			*t, data, err = msgp.ReadFloat64Bytes(data)
-			if err != nil {
-				return
-			}
-		case *complex64:
-			*t, data, err = msgp.ReadComplex64Bytes(data)
-			if err != nil {
-				return
-			}
-		case *complex128:
-			*t, data, err = msgp.ReadComplex128Bytes(data)
-			if err != nil {
-				return
-			}
-		case *uint8:
-			*t, data, err = msgp.ReadUint8Bytes(data)
-			if err != nil {
-				return
-			}
-		case *uint16:
-			*t, data, err = msgp.ReadUint16Bytes(data)
-			if err != nil {
-				return
-			}
-		case *uint32:
-			*t, data, err = msgp.ReadUint32Bytes(data)
-			if err != nil {
-				return
-			}
-		case *uint64:
-			*t, data, err = msgp.ReadUint64Bytes(data)
-			if err != nil {
-				return
-			}
-		case *uint:
-			*t, data, err = msgp.ReadUintBytes(data)
-			if err != nil {
-				return
-			}
-		case *int8:
-			*t, data, err = msgp.ReadInt8Bytes(data)
-			if err != nil {
-				return
-			}
-		case *int16:
-			*t, data, err = msgp.ReadInt16Bytes(data)
-			if err != nil {
-				return
-			}
-		case *int32:
-			*t, data, err = msgp.ReadInt32Bytes(data)
-			if err != nil {
-				return
-			}
-		case *int64:
-			*t, data, err = msgp.ReadInt64Bytes(data)
-			if err != nil {
-				return
-			}
-		case *int:
-			*t, data, err = msgp.ReadIntBytes(data)
-			if err != nil {
-				return
-			}
-		case *time.Duration:
-			var vv int64
-			vv, data, err = msgp.ReadInt64Bytes(data)
-			if err != nil {
-				return
-			}
-			*t = time.Duration(vv)
-		case *time.Time:
-			*t, data, err = msgp.ReadTimeBytes(data)
-			if err != nil {
-				return
-			}
-		case *string:
-			*t, data, err = msgp.ReadStringBytes(data)
-			if err != nil {
-				return
-			}
-		case *[]byte:
-			*t, data, err = msgp.ReadBytesZC(data)
-			if err != nil {
-				return
-			}
-		case *map[string]interface{}:
-			*t, data, err = msgp.ReadMapStrIntfBytes(data, nil)
-			if err != nil {
-				return
-			}
-		case *interface{}:
-			*t, data, err = msgp.ReadIntfBytes(data)
-			if err != nil {
-				return
-			}
-		default:
-			t, data, err = msgp.ReadIntfBytes(data)
-			if err != nil {
-				return
-			}
-			v := reflect.ValueOf(t)
-			if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
-				v = v.Elem()
-			}
-			in[i].Elem().Set(v)
+		data, err = msgpUnmashalArg(in[i], data)
+		if err != nil {
+			return
 		}
-
 		if args[i].Kind() != reflect.Ptr {
 			in[i] = in[i].Elem()
 		}
