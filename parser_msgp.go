@@ -150,6 +150,10 @@ func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
 			}
 		}
 		return data, nil
+	case reflect.Interface:
+		return data, fmt.Errorf("%v: not concrete type", ie.Type())
+	case reflect.Invalid, reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Struct, reflect.Map:
+		return data, fmt.Errorf("%v unsuppported", ie.Type())
 	}
 
 	vv, data, err := msgp.ReadIntfBytes(data)

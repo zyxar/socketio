@@ -3,6 +3,7 @@ package socketio
 import (
 	"bytes"
 	"testing"
+	"unsafe"
 
 	"github.com/tinylib/msgp/msgp"
 )
@@ -358,6 +359,37 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			return
 		}
 		ff.fn.Call(in)
+	}
+	{
+		data, err := msgp.AppendIntf(nil, []interface{}{foos[0]})
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		ff := newHandleFn(func(i unsafe.Pointer) {})
+		if _, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+			t.Error("unmarshal should return error")
+		}
+
+		ff = newHandleFn(func(i msgp.Unmarshaler) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+			t.Error("unmarshal should return error")
+		}
+
+		ff = newHandleFn(func(i struct{}) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+			t.Error("unmarshal should return error")
+		}
+
+		ff = newHandleFn(func(i chan byte) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+			t.Error("unmarshal should return error")
+		}
+
+		ff = newHandleFn(func(i func()) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+			t.Error("unmarshal should return error")
+		}
 	}
 }
 
