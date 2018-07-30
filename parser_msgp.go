@@ -123,14 +123,12 @@ func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
 		if err != nil {
 			return data, err
 		}
-		slice := reflect.MakeSlice(ie.Type(), 0, int(sz))
+		slice := reflect.MakeSlice(ie.Type(), int(sz), int(sz))
 		for i := 0; i < int(sz); i++ {
-			vv := reflect.New(ie.Type().Elem())
-			data, err = msgpUnmashalArg(vv, data)
+			data, err = msgpUnmashalArg(slice.Index(i).Addr(), data)
 			if err != nil {
 				return data, err
 			}
-			slice = reflect.Append(slice, vv.Elem())
 		}
 		ie.Set(slice)
 		return data, nil

@@ -32,5 +32,8 @@ func (e *handleFn) Call(au ArgsUnmarshaler, data []byte, buffer [][]byte) ([]ref
 	if err != nil {
 		return nil, err
 	}
+	if e.fn.Type().IsVariadic() {
+		return e.fn.CallSlice(in), nil
+	}
 	return e.fn.Call(in), nil
 }

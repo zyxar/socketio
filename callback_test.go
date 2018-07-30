@@ -46,3 +46,15 @@ func TestBufferHandleFn(t *testing.T) {
 		t.Error(err.Error())
 	}
 }
+
+func TestVariadicCallback(t *testing.T) {
+	ff := newHandleFn(func(a string, b ...int) {
+		if a != "message" || len(b) != 3 || b[0] != 1 || b[1] != 2 || b[2] != 3 {
+			t.Error("variadict func calling incorrect")
+		}
+	})
+	_, err := ff.Call(defaultDecoder{}, []byte(`["message", [1, 2, 3]]`), nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
+}

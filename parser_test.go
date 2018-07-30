@@ -242,6 +242,23 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			return
 		}
 		ff.fn.Call(in)
+
+		ff = newHandleFn(func(i ...int) {
+			if len(i) != len(ints) || cap(i) != cap(ints) {
+				t.Error("unmarshal ...int incorrect")
+			}
+			for j := range i {
+				if i[j] != ints[j] {
+					t.Error("unmarshal ...int", j, "incorrect")
+				}
+			}
+		})
+		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		if err != nil {
+			t.Error(err.Error())
+			return
+		}
+		ff.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{strings})
@@ -281,6 +298,23 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			return
 		}
 		ff.fn.Call(in)
+
+		ff = newHandleFn(func(i ...string) {
+			if len(i) != len(strings) || cap(i) != cap(strings) {
+				t.Error("unmarshal ...string incorrect")
+			}
+			for j := range i {
+				if i[j] != strings[j] {
+					t.Error("unmarshal ...string", j, "incorrect")
+				}
+			}
+		})
+		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		if err != nil {
+			t.Error(err.Error())
+			return
+		}
+		ff.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{bytess})
@@ -320,6 +354,23 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			return
 		}
 		ff.fn.Call(in)
+
+		ff = newHandleFn(func(i ...[]byte) {
+			if len(i) != len(bytess) || cap(i) != cap(bytess) {
+				t.Error("unmarshal ...[]byte incorrect")
+			}
+			for j := range i {
+				if !bytes.Equal(i[j], bytess[j]) {
+					t.Error("unmarshal ...[]byte", j, "incorrect")
+				}
+			}
+		})
+		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		if err != nil {
+			t.Error(err.Error())
+			return
+		}
+		ff.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{foos})
@@ -359,6 +410,23 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			return
 		}
 		ff.fn.Call(in)
+
+		ff = newHandleFn(func(i ...foobar) {
+			if len(i) != len(foos) || cap(i) != cap(foos) {
+				t.Error("unmarshal ...foobar incorrect")
+			}
+			for j := range i {
+				if i[j].Foo != foos[j].Foo {
+					t.Error("unmarshal ...foobar", j, "incorrect")
+				}
+			}
+		})
+		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		if err != nil {
+			t.Error(err.Error())
+			return
+		}
+		ff.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{foos[0]})
