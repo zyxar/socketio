@@ -152,20 +152,64 @@ func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
 		return data, nil
 	case reflect.Interface:
 		return data, fmt.Errorf("%v: not concrete type", ie.Type())
-	case reflect.Invalid, reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Struct, reflect.Map:
+	case reflect.Invalid, reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Struct:
 		return data, fmt.Errorf("%v unsuppported", ie.Type())
+	case reflect.Map:
+		mapType := ie.Type()
+		if mapType.Key().Kind() != reflect.String {
+			return data, fmt.Errorf("%v unsuppported", mapType)
+		}
+		switch mapType.Elem().Kind() {
+		case reflect.Invalid, reflect.Chan, reflect.Interface, reflect.Func, reflect.UnsafePointer, reflect.Struct:
+			return data, fmt.Errorf("%v unsuppported", mapType)
+		}
+		var vv reflect.Value
+		vv, data, err = msgpReadMap(data, mapType)
+		if err != nil {
+			return data, err
+		}
+		ie.Set(vv)
+		return data, nil
 	}
 
-	vv, data, err := msgp.ReadIntfBytes(data)
-	if err != nil {
-		return data, err
+	// vv, data, err := msgp.ReadIntfBytes(data)
+	// if err != nil {
+	// 	return data, err
+	// }
+	// v := reflect.ValueOf(vv)
+	// if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+	// 	v = v.Elem()
+	// }
+	// ie.Set(v)
+	return data, fmt.Errorf("%v unsuppported", ie.Type())
+}
+
+func msgpReadMap(b []byte, mapType reflect.Type) (v reflect.Value, o []byte, err error) {
+	var sz uint32
+	o = b
+	if sz, o, err = msgp.ReadMapHeaderBytes(o); err != nil {
+		return
 	}
-	v := reflect.ValueOf(vv)
-	if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
-		v = v.Elem()
+	v = reflect.MakeMapWithSize(mapType, int(sz))
+	valType := mapType.Elem()
+	for z := uint32(0); z < sz; z++ {
+		if len(o) < 1 {
+			err = msgp.ErrShortBytes
+			return
+		}
+		var key []byte
+		key, o, err = msgp.ReadMapKeyZC(o)
+		if err != nil {
+			return
+		}
+		val := reflect.New(valType)
+		o, err = msgpUnmashalArg(val, o)
+		if err != nil {
+			return
+		}
+		v.SetMapIndex(reflect.ValueOf(string(key)), val.Elem())
 	}
-	ie.Set(v)
-	return data, err
+	return
 }
 
 func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte) (in []reflect.Value, err error) {
