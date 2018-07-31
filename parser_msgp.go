@@ -175,7 +175,7 @@ func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
 	// 	return data, err
 	// }
 	// v := reflect.ValueOf(vv)
-	// if v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+	// if v.Kind() == reflect.Ptr {
 	// 	v = v.Elem()
 	// }
 	// ie.Set(v)
@@ -211,18 +211,21 @@ func msgpReadMap(b []byte, mapType reflect.Type) (v reflect.Value, o []byte, err
 }
 
 func (msgpackDecoder) UnmarshalArgs(args []reflect.Type, data []byte, _ [][]byte) (in []reflect.Value, err error) {
-	var sz uint32
-	sz, data, err = msgp.ReadArrayHeaderBytes(data)
+	// var sz uint32
+	_, data, err = msgp.ReadArrayHeaderBytes(data)
 	if err != nil {
 		return
 	}
-	if len(args) > int(sz) {
-		err = fmt.Errorf("not enough data to init %d arguments but only %d data", len(args), sz)
-		return
-	}
+	// if len(args) > int(sz) {
+	// 	err = fmt.Errorf("not enough data to init %d arguments but only %d data", len(args), sz)
+	// 	return
+	// }
 
 	in = make([]reflect.Value, len(args))
 	for i, typ := range args {
+		if isTypeSocket(typ) {
+			continue
+		}
 		if typ.Kind() == reflect.Ptr {
 			typ = typ.Elem()
 		}

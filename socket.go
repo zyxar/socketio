@@ -20,13 +20,12 @@ type Socket interface {
 	Emit(event string, args ...interface{}) (err error)
 	EmitError(arg interface{}) (err error)
 	Namespace() string
-	// On(nsp string, event string, callback interface{})
-	// OnDisconnect(fn func(nsp string))
-	// OnError(fn func(nsp string, err interface{}))
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
 	Sid() string
 	io.Closer
+	// OnDisconnect(fn func(string))
+	// OnError(fn func(nsp string, err interface{}))
 }
 
 type nspSock struct {
@@ -112,7 +111,7 @@ func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au
 	ack, ok := s.acks[nsp]
 	s.mutex.RUnlock()
 	if ok {
-		err = ack.fireAck(id, data, buffer, au)
+		err = ack.fireAck(&nspSock{s, nsp}, id, data, buffer, au)
 	}
 	return
 }

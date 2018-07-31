@@ -127,6 +127,9 @@ func (s *Server) process(sock *socket, p *Packet) {
 				sock.onError(p.Namespace, err)
 			}
 		}
+		if s.onConnect != nil {
+			s.onConnect(&nspSock{sock, p.Namespace})
+		}
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
 	case PacketTypeEvent, PacketTypeBinaryEvent:
@@ -140,7 +143,7 @@ func (s *Server) process(sock *socket, p *Packet) {
 		if event == "" {
 			return
 		}
-		v, err := nsp.fireEvent(event, data, bin, sock.decoder)
+		v, err := nsp.fireEvent(&nspSock{sock, p.Namespace}, event, data, bin, sock.decoder)
 		if err != nil {
 			if sock.onError != nil {
 				sock.onError(p.Namespace, err)

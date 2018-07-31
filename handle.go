@@ -17,10 +17,10 @@ func (e *namespace) OnEvent(event string, callback interface{}) Namespace {
 	return e
 }
 
-func (e *namespace) fireEvent(event string, args []byte, buffer [][]byte, au ArgsUnmarshaler) ([]reflect.Value, error) {
+func (e *namespace) fireEvent(so Socket, event string, args []byte, buffer [][]byte, au ArgsUnmarshaler) ([]reflect.Value, error) {
 	fn, ok := e.callbacks[event]
 	if ok {
-		return fn.Call(au, args, buffer)
+		return fn.Call(so, au, args, buffer)
 	}
 	return nil, nil
 }
@@ -31,7 +31,7 @@ type ackHandle struct {
 	mutex  sync.RWMutex
 }
 
-func (a *ackHandle) fireAck(id uint64, data []byte, buffer [][]byte, au ArgsUnmarshaler) (err error) {
+func (a *ackHandle) fireAck(so Socket, id uint64, data []byte, buffer [][]byte, au ArgsUnmarshaler) (err error) {
 	a.mutex.RLock()
 	fn, ok := a.ackmap[id]
 	a.mutex.RUnlock()
@@ -39,7 +39,7 @@ func (a *ackHandle) fireAck(id uint64, data []byte, buffer [][]byte, au ArgsUnma
 		a.mutex.Lock()
 		delete(a.ackmap, id)
 		a.mutex.Unlock()
-		_, err = fn.Call(au, data, buffer)
+		_, err = fn.Call(so, au, data, buffer)
 	}
 	return
 }
