@@ -6,35 +6,19 @@ import (
 	"sync/atomic"
 )
 
-type nspHandle struct {
-	eventHandle
-	ackHandle
+type namespace struct{ callbacks map[string]*callback }
+
+type Namespace interface {
+	OnEvent(event string, callback interface{}) Namespace // chainable
 }
 
-func newNspHandle(namespace string) *nspHandle {
-	return &nspHandle{
-		eventHandle: eventHandle{
-			handlers: make(map[string]*callback),
-		},
-		ackHandle: ackHandle{ackmap: make(map[uint64]*callback)},
-	}
+func (e *namespace) OnEvent(event string, callback interface{}) Namespace {
+	e.callbacks[event] = newCallback(callback)
+	return e
 }
 
-type eventHandle struct {
-	handlers map[string]*callback
-	mutex    sync.RWMutex
-}
-
-func (e *eventHandle) onEvent(event string, callback interface{}) {
-	e.mutex.Lock()
-	e.handlers[event] = newCallback(callback)
-	e.mutex.Unlock()
-}
-
-func (e *eventHandle) fireEvent(event string, args []byte, buffer [][]byte, au ArgsUnmarshaler) ([]reflect.Value, error) {
-	e.mutex.RLock()
-	fn, ok := e.handlers[event]
-	e.mutex.RUnlock()
+func (e *namespace) fireEvent(event string, args []byte, buffer [][]byte, au ArgsUnmarshaler) ([]reflect.Value, error) {
+	fn, ok := e.callbacks[event]
 	if ok {
 		return fn.Call(au, args, buffer)
 	}

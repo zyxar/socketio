@@ -13,8 +13,9 @@ type Server struct {
 	engine    *engine.Server
 	sockets   map[*engine.Socket]*socket
 	sockLock  sync.RWMutex
-	onConnect func(so Socket) error
+	onConnect func(so Socket)
 	onError   func(so Socket, err error)
+	nsps      map[string]*namespace
 }
 
 // NewServer creates a socket.io server instance upon underlying engine.io transport
@@ -22,11 +23,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 	e, err := engine.NewServer(interval, timeout, func(ß *engine.Socket) {
 		socket := newServerSocket(ß, parser)
 		if server.onConnect != nil {
-			if err = server.onConnect(socket); err != nil {
-				if server.onError != nil {
-					server.onError(socket, err)
-				}
-			}
+			server.onConnect(&nspSock{socket, "/"})
 		}
 		if err := socket.emitPacket(&Packet{
 			Type:      PacketTypeConnect,
@@ -43,7 +40,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 	if err != nil {
 		return
 	}
-	server = &Server{engine: e, sockets: make(map[*engine.Socket]*socket)}
+	server = &Server{engine: e, sockets: make(map[*engine.Socket]*socket), nsps: make(map[string]*namespace)}
 
 	e.On(engine.EventMessage, engine.Callback(func(ß *engine.Socket, msgType engine.MessageType, data []byte) {
 		server.sockLock.RLock()
@@ -60,7 +57,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		}
 		if err := socket.decoder.Add(msgType, data); err != nil {
 			if server.onError != nil {
-				server.onError(socket, err)
+				server.onError(&nspSock{socket, ""}, err)
 			}
 		}
 		if p := socket.yield(); p != nil {
@@ -85,37 +82,43 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 	return
 }
 
-// ServeHTTP implements http.Handler interface
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.engine.ServeHTTP(w, r)
+func (s *Server) Namespace(nsp string) Namespace { return s.creatensp(nsp) }
+
+func (s *Server) creatensp(nsp string) *namespace {
+	n, ok := s.nsps[nsp]
+	if !ok {
+		n = &namespace{callbacks: make(map[string]*callback)}
+		s.nsps[nsp] = n
+	}
+	return n
 }
+
+func (s *Server) getnsp(nsp string) (n *namespace, ok bool) { n, ok = s.nsps[nsp]; return }
+
+// ServeHTTP implements http.Handler interface
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.engine.ServeHTTP(w, r) }
 
 // Close closes underlying engine.io transport
-func (s *Server) Close() error {
-	return s.engine.Close()
-}
+func (s *Server) Close() error { return s.engine.Close() }
 
 // OnConnect registers fn as callback to be called when a socket connects
-func (s *Server) OnConnect(fn func(so Socket) error) {
-	s.onConnect = fn
-}
+func (s *Server) OnConnect(fn func(so Socket)) { s.onConnect = fn }
 
 // OnError registers fn as callback for error handling
-func (s *Server) OnError(fn func(so Socket, err error)) {
-	s.onError = fn
-}
+func (s *Server) OnError(fn func(so Socket, err error)) { s.onError = fn }
 
 // process is the Packet process handle on server side
-func (*Server) process(sock *socket, p *Packet) {
-	nsp := sock.attachnsp(p.Namespace)
-	if nsp == nil {
+func (s *Server) process(sock *socket, p *Packet) {
+	nsp, ok := s.getnsp(p.Namespace)
+	if !ok {
 		if p.Type > PacketTypeDisconnect {
-			sock.EmitError(p.Namespace, ErrorNamespaceUnavaialble.Error())
+			sock.emitError(p.Namespace, ErrorNamespaceUnavaialble.Error())
 		}
 		return
 	}
 	switch p.Type {
 	case PacketTypeConnect:
+		sock.attachnsp(p.Namespace)
 		if err := sock.emitPacket(&Packet{
 			Type:      PacketTypeConnect,
 			Namespace: p.Namespace,
@@ -169,7 +172,7 @@ func (*Server) process(sock *socket, p *Packet) {
 				}
 				return
 			}
-			nsp.fireAck(*p.ID, data, bin, sock.decoder)
+			sock.fireAck(p.Namespace, *p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
 		if sock.onError != nil {
