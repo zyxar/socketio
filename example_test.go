@@ -57,7 +57,17 @@ func ExampleServer() {
 		so.Emit("event", "hello world!")
 	})
 
+	var onDisconnect = func(so socketio.Socket) {
+		log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
+	}
+
+	var onError = func(so socketio.Socket, err ...interface{}) {
+		log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
+	}
+
 	server.Namespace("/").
+		OnDisconnect(onDisconnect).
+		OnError(onError).
 		OnEvent("message", func(so socketio.Socket, data string) {
 			if err := so.Emit("ack", "woot", func(msg string, b *socketio.Bytes) {
 				bb, _ := b.MarshalBinary()
@@ -76,17 +86,12 @@ func ExampleServer() {
 		})
 
 	server.Namespace("/ditto").
+		OnDisconnect(onDisconnect).
+		OnError(onError).
 		OnEvent("disguise", func(msg interface{}, b socketio.Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%v: %x", msg, bb)
 		})
-
-	// so.OnDisconnect(func(nsp string) {
-	// 	log.Printf("%q disconnected", nsp)
-	// })
-	// so.OnError(func(nsp string, err interface{}) {
-	// 	log.Printf("socket nsp=%q, error=%v", nsp, err)
-	// })
 
 	server.OnError(func(so socketio.Socket, err error) {
 		log.Printf("%v error=> %v", so.RemoteAddr(), err)

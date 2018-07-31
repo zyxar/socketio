@@ -29,8 +29,8 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 			Type:      PacketTypeConnect,
 			Namespace: "/",
 		}); err != nil {
-			if socket.onError != nil {
-				socket.onError("/", err)
+			if server.onError != nil {
+				server.onError(&nspSock{socket, "/"}, err)
 			}
 		}
 		server.sockLock.Lock()
@@ -57,7 +57,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		}
 		if err := socket.decoder.Add(msgType, data); err != nil {
 			if server.onError != nil {
-				server.onError(&nspSock{socket, ""}, err)
+				server.onError(&nspSock{socket: socket, name: ""}, err)
 			}
 		}
 		if p := socket.yield(); p != nil {
@@ -76,7 +76,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		delete(server.sockets, ß)
 		server.sockLock.Unlock()
 		socket.Close()
-		socket.detachall()
+		detachall(server, socket)
 	}))
 
 	return
@@ -123,30 +123,33 @@ func (s *Server) process(sock *socket, p *Packet) {
 			Type:      PacketTypeConnect,
 			Namespace: p.Namespace,
 		}); err != nil {
-			if sock.onError != nil {
-				sock.onError(p.Namespace, err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 		}
 		if s.onConnect != nil {
-			s.onConnect(&nspSock{sock, p.Namespace})
+			s.onConnect(&nspSock{socket: sock, name: p.Namespace})
 		}
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
+		if nsp.onDisconnect != nil {
+			nsp.onDisconnect(&nspSock{socket: sock, name: p.Namespace})
+		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		event, data, bin, err := sock.decoder.ParseData(p)
 		if err != nil {
-			if sock.onError != nil {
-				sock.onError(p.Namespace, err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
 		if event == "" {
 			return
 		}
-		v, err := nsp.fireEvent(&nspSock{sock, p.Namespace}, event, data, bin, sock.decoder)
+		v, err := nsp.fireEvent(&nspSock{socket: sock, name: p.Namespace}, event, data, bin, sock.decoder)
 		if err != nil {
-			if sock.onError != nil {
-				sock.onError(p.Namespace, err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
@@ -160,30 +163,29 @@ func (s *Server) process(sock *socket, p *Packet) {
 				p.Data = d
 			}
 			if err = sock.ack(p); err != nil {
-				if sock.onError != nil {
-					sock.onError(p.Namespace, err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 			}
 		}
-
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil {
 			_, data, bin, err := sock.decoder.ParseData(p)
 			if err != nil {
-				if sock.onError != nil {
-					sock.onError(p.Namespace, err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 				return
 			}
 			sock.fireAck(p.Namespace, *p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
-		if sock.onError != nil {
-			sock.onError(p.Namespace, p.Data)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, p.Data)
 		}
 	default:
-		if sock.onError != nil {
-			sock.onError(p.Namespace, ErrUnknownPacket)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, ErrUnknownPacket)
 		}
 	}
 }

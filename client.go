@@ -43,7 +43,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 
 	e.On(engine.EventClose, engine.Callback(func(_ *engine.Socket, _ engine.MessageType, _ []byte) {
 		socket.Close()
-		socket.detachall()
+		detachall(c, socket)
 	}))
 
 	return
@@ -87,28 +87,30 @@ func (c *Client) process(sock *socket, p *Packet) {
 	if !ok {
 		return
 	}
-	nspsock := &nspSock{sock, p.Namespace}
 
 	switch p.Type {
 	case PacketTypeConnect:
 		sock.attachnsp(p.Namespace)
 		if c.onConnect != nil {
-			c.onConnect(nspsock)
+			c.onConnect(&nspSock{socket: sock, name: p.Namespace})
 		}
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)
+		if nsp.onDisconnect != nil {
+			nsp.onDisconnect(&nspSock{socket: sock, name: p.Namespace})
+		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
 		event, data, bin, err := sock.decoder.ParseData(p)
 		if err != nil {
-			if sock.onError != nil {
-				sock.onError(p.Namespace, err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
 		if event == "" {
 			return
 		}
-		v, err := nsp.fireEvent(nspsock, event, data, bin, sock.decoder)
+		v, err := nsp.fireEvent(&nspSock{socket: sock, name: p.Namespace}, event, data, bin, sock.decoder)
 		if err != nil {
 			if c.onError != nil {
 				c.onError(err)
@@ -134,8 +136,8 @@ func (c *Client) process(sock *socket, p *Packet) {
 		if p.ID != nil {
 			_, data, bin, err := sock.decoder.ParseData(p)
 			if err != nil {
-				if sock.onError != nil {
-					sock.onError(p.Namespace, err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 				return
 			}

@@ -6,10 +6,23 @@ import (
 	"sync/atomic"
 )
 
-type namespace struct{ callbacks map[string]*callback }
+type namespace struct {
+	callbacks    map[string]*callback
+	onError      func(so Socket, err ...interface{})
+	onDisconnect func(so Socket)
+}
 
 type Namespace interface {
-	OnEvent(event string, callback interface{}) Namespace // chainable
+	OnEvent(event string, callback interface{}) Namespace     // chainable
+	OnDisconnect(fn func(so Socket)) Namespace                // chainable
+	OnError(fn func(so Socket, err ...interface{})) Namespace // chainable
+}
+
+func (e *namespace) OnDisconnect(fn func(so Socket)) Namespace { e.onDisconnect = fn; return e }
+
+func (e *namespace) OnError(fn func(so Socket, err ...interface{})) Namespace {
+	e.onError = fn
+	return e
 }
 
 func (e *namespace) OnEvent(event string, callback interface{}) Namespace {

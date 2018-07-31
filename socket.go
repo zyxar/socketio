@@ -24,8 +24,6 @@ type Socket interface {
 	LocalAddr() net.Addr
 	Sid() string
 	io.Closer
-	// OnDisconnect(fn func(string))
-	// OnError(fn func(nsp string, err interface{}))
 }
 
 type nspSock struct {
@@ -44,22 +42,18 @@ func (n *nspSock) EmitError(arg interface{}) (err error) {
 }
 
 type socket struct {
-	so      *engine.Socket
+	ß       *engine.Socket
 	encoder Encoder
 	decoder Decoder
-
-	onError      func(nsp string, err interface{})
-	onDisconnect func(nsp string)
-
-	acks  map[string]*ackHandle
-	mutex sync.RWMutex
+	acks    map[string]*ackHandle
+	mutex   sync.RWMutex
 }
 
-func newServerSocket(so *engine.Socket, parser Parser) *socket {
+func newServerSocket(ß *engine.Socket, parser Parser) *socket {
 	encoder := parser.Encoder()
 	decoder := parser.Decoder()
 	socket := &socket{
-		so:      so,
+		ß:       ß,
 		encoder: encoder,
 		decoder: decoder,
 		acks:    make(map[string]*ackHandle),
@@ -68,9 +62,9 @@ func newServerSocket(so *engine.Socket, parser Parser) *socket {
 	return socket
 }
 
-func newClientSocket(so *engine.Socket, parser Parser) *socket {
+func newClientSocket(ß *engine.Socket, parser Parser) *socket {
 	return &socket{
-		so:      so,
+		ß:       ß,
 		encoder: parser.Encoder(),
 		decoder: parser.Decoder(),
 		acks:    make(map[string]*ackHandle),
@@ -90,20 +84,23 @@ func (s *socket) detachnsp(nsp string) {
 		delete(s.acks, nsp)
 	}
 	s.mutex.Unlock()
-	if ok && s.onDisconnect != nil {
-		s.onDisconnect(nsp)
-	}
 }
 
-func (s *socket) detachall() {
-	s.mutex.Lock()
-	for k := range s.acks {
-		delete(s.acks, k)
-		if s.onDisconnect != nil {
-			s.onDisconnect(k)
+type nspStore interface {
+	getnsp(nsp string) (n *namespace, ok bool)
+}
+
+func detachall(s nspStore, sock *socket) {
+	sock.mutex.Lock()
+	for k := range sock.acks {
+		delete(sock.acks, k)
+		if nsp, ok := s.getnsp(k); ok {
+			if nsp.onDisconnect != nil {
+				nsp.onDisconnect(&nspSock{socket: sock, name: k})
+			}
 		}
 	}
-	s.mutex.Unlock()
+	sock.mutex.Unlock()
 }
 
 func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au ArgsUnmarshaler) (err error) {
@@ -111,7 +108,7 @@ func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au
 	ack, ok := s.acks[nsp]
 	s.mutex.RUnlock()
 	if ok {
-		err = ack.fireAck(&nspSock{s, nsp}, id, data, buffer, au)
+		err = ack.fireAck(&nspSock{socket: s, name: nsp}, id, data, buffer, au)
 	}
 	return
 }
@@ -158,11 +155,11 @@ func (s *socket) emitPacket(p *Packet) (err error) {
 	if err != nil {
 		return
 	}
-	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b); err != nil {
+	if err = s.ß.Emit(engine.EventMessage, MessageTypeString, b); err != nil {
 		return
 	}
 	for _, d := range bin {
-		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
+		if err = s.ß.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
 			return
 		}
 	}
@@ -178,9 +175,7 @@ func (s *socket) yield() *Packet {
 	}
 }
 
-func (s *socket) Sid() string                                  { return s.so.Sid() }
-func (s *socket) Close() (err error)                           { return s.so.Close() }
-func (s *socket) OnError(fn func(nsp string, err interface{})) { s.onError = fn }
-func (s *socket) OnDisconnect(fn func(nsp string))             { s.onDisconnect = fn }
-func (s *socket) LocalAddr() net.Addr                          { return s.so.LocalAddr() }
-func (s *socket) RemoteAddr() net.Addr                         { return s.so.RemoteAddr() }
+func (s *socket) Sid() string          { return s.ß.Sid() }
+func (s *socket) Close() (err error)   { return s.ß.Close() }
+func (s *socket) LocalAddr() net.Addr  { return s.ß.LocalAddr() }
+func (s *socket) RemoteAddr() net.Addr { return s.ß.RemoteAddr() }
