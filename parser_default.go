@@ -129,6 +129,9 @@ func (defaultDecoder) UnmarshalArgs(args []reflect.Type, data []byte, buffer [][
 	argv := make([]interface{}, 0, len(args))
 	in := make([]reflect.Value, len(args))
 	for i, typ := range args {
+		if isTypeSocket(typ) {
+			continue
+		}
 		if typ.Kind() == reflect.Ptr {
 			typ = typ.Elem()
 		}
@@ -149,6 +152,9 @@ func (defaultDecoder) UnmarshalArgs(args []reflect.Type, data []byte, buffer [][
 		return nil, err
 	}
 	for i := range args {
+		if isTypeSocket(args[i]) {
+			continue
+		}
 		if args[i].Kind() != reflect.Ptr {
 			in[i] = in[i].Elem()
 		}

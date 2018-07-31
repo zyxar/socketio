@@ -9,20 +9,25 @@ import (
 // Client is socket.io client
 type Client struct {
 	engine *engine.Client
-	Socket
+	*socket
+	nsps    map[string]*namespace
+	onError func(err interface{})
+}
 
-	onConnect func(string, Socket)
-	onError   func(err interface{})
+// NewClient creates a Client instance; use Dial to initialize underlying network
+func NewClient() (c *Client) {
+	return &Client{nsps: make(map[string]*namespace)}
 }
 
 // Dial connects to a socket.io server represented by `rawurl` and create Client instance on success.
-func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(string, Socket)) (c *Client, err error) {
+func (c *Client) Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
 		return
 	}
-	socket := newClientSocket(e.Socket, parser)
-	c = &Client{engine: e, Socket: socket, onConnect: onConnect}
+	socket := newSocket(e.Socket, parser)
+	c.engine = e
+	c.socket = socket
 	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
@@ -42,16 +47,14 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 
 	e.On(engine.EventClose, engine.Callback(func(_ *engine.Socket, _ engine.MessageType, _ []byte) {
 		socket.Close()
-		socket.mutex.Lock()
-		for k := range socket.nsp {
-			if socket.onDisconnect != nil {
-				socket.onDisconnect(k)
-			}
-		}
-		socket.mutex.Unlock()
+		detachall(c, socket)
 	}))
-
 	return
+}
+
+// Emit send event messages to namespace `nsp`
+func (c *Client) Emit(nsp string, event string, args ...interface{}) (err error) {
+	return c.socket.emit(nsp, event, args...)
 }
 
 // Sid returns session id assigned by socket.io server
@@ -69,35 +72,53 @@ func (c *Client) OnError(fn func(interface{})) {
 	c.onError = fn
 }
 
+// Namespace ensures a Namespace instance exists in client
+func (c *Client) Namespace(nsp string) Namespace { return c.creatensp(nsp) }
+
+func (c *Client) creatensp(nsp string) *namespace {
+	n, ok := c.nsps[nsp]
+	if !ok {
+		n = &namespace{callbacks: make(map[string]*callback)}
+		c.nsps[nsp] = n
+	}
+	return n
+}
+
+func (c *Client) getnsp(nsp string) (n *namespace, ok bool) { n, ok = c.nsps[nsp]; return }
+
 // process is the Packet process handle on client side
 func (c *Client) process(sock *socket, p *Packet) {
-	nsp := sock.creatensp(p.Namespace)
+	nsp, ok := c.getnsp(p.Namespace)
+	if !ok {
+		return
+	}
 
 	switch p.Type {
 	case PacketTypeConnect:
-		if c.onConnect != nil {
-			c.onConnect(p.Namespace, sock)
+		sock.attachnsp(p.Namespace)
+		if nsp.onConnect != nil {
+			nsp.onConnect(&nspSock{socket: sock, name: p.Namespace})
 		}
 	case PacketTypeDisconnect:
-		if sock.onDisconnect != nil {
-			sock.onDisconnect(p.Namespace)
+		sock.detachnsp(p.Namespace)
+		if nsp.onDisconnect != nil {
+			nsp.onDisconnect(&nspSock{socket: sock, name: p.Namespace})
 		}
 	case PacketTypeEvent, PacketTypeBinaryEvent:
-
 		event, data, bin, err := sock.decoder.ParseData(p)
 		if err != nil {
-			if sock.onError != nil {
-				sock.onError(p.Namespace, err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
 		if event == "" {
 			return
 		}
-		v, err := nsp.fireEvent(event, data, bin, sock.decoder)
+		v, err := nsp.fireEvent(&nspSock{socket: sock, name: p.Namespace}, event, data, bin, sock.decoder)
 		if err != nil {
-			if c.onError != nil {
-				c.onError(err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
@@ -111,30 +132,29 @@ func (c *Client) process(sock *socket, p *Packet) {
 				p.Data = d
 			}
 			if err = sock.ack(p); err != nil {
-				if c.onError != nil {
-					c.onError(err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 			}
 		}
-
 	case PacketTypeAck, PacketTypeBinaryAck:
 		if p.ID != nil {
 			_, data, bin, err := sock.decoder.ParseData(p)
 			if err != nil {
-				if sock.onError != nil {
-					sock.onError(p.Namespace, err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 				return
 			}
-			nsp.fireAck(*p.ID, data, bin, sock.decoder)
+			sock.fireAck(p.Namespace, *p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
-		if c.onError != nil {
-			c.onError(p.Data)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, p.Data)
 		}
 	default:
-		if c.onError != nil {
-			c.onError(ErrUnknownPacket)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, ErrUnknownPacket)
 		}
 	}
 }

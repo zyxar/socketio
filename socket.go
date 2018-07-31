@@ -17,121 +17,115 @@ var (
 
 // Socket is abstraction of bidirectional socket.io connection
 type Socket interface {
-	Emit(nsp string, event string, args ...interface{}) (err error)
-	EmitError(nsp string, arg interface{}) (err error)
-	On(nsp string, event string, callback interface{})
-	OnDisconnect(fn func(nsp string))
-	OnError(fn func(nsp string, err interface{}))
+	Emit(event string, args ...interface{}) (err error)
+	EmitError(arg interface{}) (err error)
+	Namespace() string
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
 	Sid() string
 	io.Closer
 }
 
+type nspSock struct {
+	*socket
+	name string
+}
+
+// Namespace implements Socket.Namespace
+func (n *nspSock) Namespace() string { return n.name }
+
+// Emit implements Socket.Emit
+func (n *nspSock) Emit(event string, args ...interface{}) (err error) {
+	return n.socket.emit(n.name, event, args...)
+}
+
+// EmitError implements Socket.EmitError
+func (n *nspSock) EmitError(arg interface{}) (err error) {
+	return n.socket.emitError(n.name, arg)
+}
+
 type socket struct {
-	so      *engine.Socket
+	ß       *engine.Socket
 	encoder Encoder
 	decoder Decoder
-
-	onError      func(nsp string, err interface{})
-	onDisconnect func(nsp string)
-
-	nsp     map[string]*nspHandle
-	nspAttr map[string]struct{}
+	acks    map[string]*ackHandle
 	mutex   sync.RWMutex
 }
 
-func newServerSocket(so *engine.Socket, parser Parser) *socket {
-	encoder := parser.Encoder()
-	decoder := parser.Decoder()
-	socket := &socket{
-		so:      so,
-		encoder: encoder,
-		decoder: decoder,
-		nsp:     make(map[string]*nspHandle),
-		nspAttr: make(map[string]struct{}),
-	}
-	socket.creatensp("/")
-	socket.attachnsp("/")
-	return socket
-}
-
-func newClientSocket(so *engine.Socket, parser Parser) *socket {
+func newSocket(ß *engine.Socket, parser Parser) *socket {
 	return &socket{
-		so:      so,
+		ß:       ß,
 		encoder: parser.Encoder(),
 		decoder: parser.Decoder(),
-		nsp:     make(map[string]*nspHandle),
+		acks:    make(map[string]*ackHandle),
 	}
 }
 
-func (s *socket) attachnsp(nsp string) *nspHandle {
-	n, ok := s.namespace(nsp)
-	if !ok {
-		return nil
-	}
+func (s *socket) attachnsp(nsp string) {
 	s.mutex.Lock()
-	s.nspAttr[nsp] = struct{}{}
+	s.acks[nsp] = &ackHandle{ackmap: make(map[uint64]*callback)}
 	s.mutex.Unlock()
-	return n
 }
 
 func (s *socket) detachnsp(nsp string) {
 	s.mutex.Lock()
-	_, ok := s.nspAttr[nsp]
+	_, ok := s.acks[nsp]
 	if ok {
-		delete(s.nspAttr, nsp)
+		delete(s.acks, nsp)
 	}
 	s.mutex.Unlock()
-	if ok && s.onDisconnect != nil {
-		s.onDisconnect(nsp)
-	}
 }
 
-func (s *socket) detachall() {
-	s.mutex.Lock()
-	for k := range s.nsp {
-		if _, ok := s.nspAttr[k]; ok {
-			delete(s.nspAttr, k)
-			if s.onDisconnect != nil {
-				s.onDisconnect(k)
+type nspStore interface {
+	getnsp(nsp string) (n *namespace, ok bool)
+}
+
+func detachall(s nspStore, sock *socket) {
+	sock.mutex.Lock()
+	for k := range sock.acks {
+		delete(sock.acks, k)
+		if nsp, ok := s.getnsp(k); ok {
+			if nsp.onDisconnect != nil {
+				nsp.onDisconnect(&nspSock{socket: sock, name: k})
 			}
 		}
 	}
-	s.mutex.Unlock()
+	sock.mutex.Unlock()
 }
 
-func (s *socket) creatensp(nsp string) *nspHandle {
-	s.mutex.Lock()
-	n, ok := s.nsp[nsp]
-	if !ok {
-		n = newNspHandle(nsp)
-		s.nsp[nsp] = n
-	}
-	s.mutex.Unlock()
-	return n
-}
-
-func (s *socket) namespace(nsp string) (*nspHandle, bool) {
+func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au ArgsUnmarshaler) (err error) {
 	s.mutex.RLock()
-	n, ok := s.nsp[nsp]
+	ack, ok := s.acks[nsp]
 	s.mutex.RUnlock()
-	return n, ok
+	if ok {
+		err = ack.fireAck(&nspSock{socket: s, name: nsp}, id, data, buffer, au)
+	}
+	return
 }
 
-func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error) {
-	namespace, ok := s.namespace(nsp)
+// Emit implements Socket.Emit
+func (s *socket) Emit(event string, args ...interface{}) (err error) {
+	return s.emit("/", event, args...)
+}
+
+// EmitError implements Socket.EmitError
+func (s *socket) EmitError(arg interface{}) (err error) { return s.emitError("/", arg) }
+
+// Namespace implements Socket.Namespace
+func (*socket) Namespace() string { return "/" }
+
+func (s *socket) emit(nsp string, event string, args ...interface{}) (err error) {
+	s.mutex.RLock()
+	ack, ok := s.acks[nsp]
+	s.mutex.RUnlock()
 	if !ok {
 		return ErrorNamespaceUnavaialble
 	}
 	data := []interface{}{event}
-	p := &Packet{
-		Type:      PacketTypeEvent,
-		Namespace: nsp,
-	}
+	p := &Packet{Type: PacketTypeEvent, Namespace: nsp}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
-			p.ID = newid(namespace.onAck(args[i]))
+			p.ID = newid(ack.onAck(args[i]))
 		} else {
 			data = append(data, args[i])
 		}
@@ -140,7 +134,7 @@ func (s *socket) Emit(nsp string, event string, args ...interface{}) (err error)
 	return s.emitPacket(p)
 }
 
-func (s *socket) EmitError(nsp string, arg interface{}) (err error) {
+func (s *socket) emitError(nsp string, arg interface{}) (err error) {
 	p := &Packet{
 		Type:      PacketTypeError,
 		Namespace: nsp,
@@ -159,19 +153,15 @@ func (s *socket) emitPacket(p *Packet) (err error) {
 	if err != nil {
 		return
 	}
-	if err = s.so.Emit(engine.EventMessage, MessageTypeString, b); err != nil {
+	if err = s.ß.Emit(engine.EventMessage, MessageTypeString, b); err != nil {
 		return
 	}
 	for _, d := range bin {
-		if err = s.so.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
+		if err = s.ß.Emit(engine.EventMessage, MessageTypeBinary, d); err != nil {
 			return
 		}
 	}
 	return
-}
-
-func (s *socket) On(nsp string, event string, callback interface{}) {
-	s.creatensp(nsp).onEvent(event, callback)
 }
 
 func (s *socket) yield() *Packet {
@@ -183,9 +173,7 @@ func (s *socket) yield() *Packet {
 	}
 }
 
-func (s *socket) Sid() string                                  { return s.so.Sid() }
-func (s *socket) Close() (err error)                           { return s.so.Close() }
-func (s *socket) OnError(fn func(nsp string, err interface{})) { s.onError = fn }
-func (s *socket) OnDisconnect(fn func(nsp string))             { s.onDisconnect = fn }
-func (s *socket) LocalAddr() net.Addr                          { return s.so.LocalAddr() }
-func (s *socket) RemoteAddr() net.Addr                         { return s.so.RemoteAddr() }
+func (s *socket) Sid() string          { return s.ß.Sid() }
+func (s *socket) Close() (err error)   { return s.ß.Close() }
+func (s *socket) LocalAddr() net.Addr  { return s.ß.LocalAddr() }
+func (s *socket) RemoteAddr() net.Addr { return s.ß.RemoteAddr() }

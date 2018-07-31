@@ -22,7 +22,7 @@ vgo get -v -u github.com/zyxar/socketio
 - `engine.io` server;
 - `engine.io` client (`websocket` only);
 - binary data;
-- limited namespace support;
+- namespace support;
 - [socket.io-msgpack-parser](https://github.com/darrachequesne/socket.io-msgpack-parser) support;
 
 
@@ -42,15 +42,20 @@ import (
 
 func main() {
 	server, _ := socketio.NewServer(time.Second*25, time.Second*5, socketio.DefaultParser)
-	server.OnConnect(func(so socketio.Socket) error {
-		so.On("/", "message", func(data string) {
+	server.Namespace("/").
+		OnConnect(func(so socketio.Socket) {
+			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
+		}).
+		OnDisconnect(func(so socketio.Socket) {
+			log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
+		}).
+		OnError(func(so socketio.Socket, err ...interface{}) {
+			log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
+		}).
+		OnEvent("message", func(so socketio.Socket, data string) {
 			log.Println(data)
 		})
-		so.OnError(func(nsp string, err interface{}) {
-			log.Printf("socket nsp=%q, error=%v", nsp, err)
-		})
-		return so.Emit("/", "event", "hello world!")
-	})
+
 	http.ListenAndServe(":8081", server)
 }
 ```
@@ -84,7 +89,7 @@ socket.on('disconnect', function() {
 
 Server:
 ```go
-	so.Emit("/", "ack", "foo", func(msg string) {
+	so.Emit("ack", "foo", func(msg string) {
 		log.Println(msg)
 	})
 ```
@@ -100,7 +105,7 @@ Client:
 
 Server:
 ```go
-	so.On("/", "foobar", func(data string) (string, string) {
+	server.Namespace("/").OnEvent("foobar", func(data string) (string, string) {
 		log.Println("foobar:", data)
 		return "foo", "bar"
 	})
@@ -117,22 +122,25 @@ Client:
 
 Server:
 ```go
-	so.On("/", "binary", func(data interface{}, b *socketio.Bytes) {
-		log.Println(data)
-		bb, _ := b.MarshalBinary()
-		log.Printf("%x", bb)
-	})
-	go func() {
-		for {
-			select {
-			case <-time.After(time.Second * 2):
-				if err := so.Emit("/", "event", "check it out!", time.Now()); err != nil {
-					log.Println(err)
-					return
+	server.Namespace("/").
+		OnEvent("binary", func(data interface{}, b *socketio.Bytes) {
+			log.Println(data)
+			bb, _ := b.MarshalBinary()
+			log.Printf("%x", bb)
+		}).
+		OnConnect(func(so socketio.Socket) {
+			go func() {
+				for {
+					select {
+					case <-time.After(time.Second * 2):
+						if err := so.Emit("event", "check it out!", time.Now()); err != nil {
+							log.Println(err)
+							return
+						}
+					}
 				}
-			}
-		}
-	}()
+			}()
+		})
 ```
 
 Client:
@@ -197,7 +205,7 @@ func (m *MessagePack) UnmarshalBinary(b []byte) error {
 
 Server:
 ```go
-	so.On("/ditto", "disguise", func(msg interface{}, b socketio.Bytes) {
+	server.Namespace("/ditto").OnEvent("disguise", func(msg interface{}, b socketio.Bytes) {
 		bb, _ := b.MarshalBinary()
 		log.Printf("%v: %x", msg, bb)
 	})
