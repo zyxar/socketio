@@ -13,23 +13,29 @@ func ExampleDial() {
 	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser,
 		func(so socketio.Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
+			if err := so.Emit("binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
+				log.Println("Emit:", err)
+			}
 		})
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
 	defer c.Close()
+	var onDisconnect = func(so socketio.Socket) {
+		log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
+	}
+
+	var onError = func(so socketio.Socket, err ...interface{}) {
+		log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
+	}
 	c.Namespace("/").
+		OnDisconnect(onDisconnect).
+		OnError(onError).
 		OnEvent("event", func(message string, b socketio.Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%s => %x", message, bb)
 		})
-	c.OnError(func(err interface{}) {
-		log.Println(err)
-	})
-	if err = c.Emit("/", "binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
-		log.Println(err)
-	}
 
 	for {
 		<-time.After(time.Second * 2)

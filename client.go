@@ -23,7 +23,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		return
 	}
 	socket := newSocket(e.Socket, parser)
-	c = &Client{engine: e, socket: socket, onConnect: onConnect}
+	c = &Client{engine: e, socket: socket, onConnect: onConnect, nsps: make(map[string]*namespace)}
 	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
@@ -112,8 +112,8 @@ func (c *Client) process(sock *socket, p *Packet) {
 		}
 		v, err := nsp.fireEvent(&nspSock{socket: sock, name: p.Namespace}, event, data, bin, sock.decoder)
 		if err != nil {
-			if c.onError != nil {
-				c.onError(err)
+			if nsp.onError != nil {
+				nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 			}
 			return
 		}
@@ -127,8 +127,8 @@ func (c *Client) process(sock *socket, p *Packet) {
 				p.Data = d
 			}
 			if err = sock.ack(p); err != nil {
-				if c.onError != nil {
-					c.onError(err)
+				if nsp.onError != nil {
+					nsp.onError(&nspSock{socket: sock, name: p.Namespace}, err)
 				}
 			}
 		}
@@ -144,12 +144,12 @@ func (c *Client) process(sock *socket, p *Packet) {
 			sock.fireAck(p.Namespace, *p.ID, data, bin, sock.decoder)
 		}
 	case PacketTypeError:
-		if c.onError != nil {
-			c.onError(p.Data)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, p.Data)
 		}
 	default:
-		if c.onError != nil {
-			c.onError(ErrUnknownPacket)
+		if nsp.onError != nil {
+			nsp.onError(&nspSock{socket: sock, name: p.Namespace}, ErrUnknownPacket)
 		}
 	}
 }
