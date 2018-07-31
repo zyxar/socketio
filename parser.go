@@ -35,8 +35,14 @@ type Decoder interface {
 	ArgsUnmarshaler
 }
 
+// ArgsUnmarshaler unmarshals func arguments `args` from data and binary (bin, if exists).
+// Decoder should implement ArgsUnmarshaler.
+// For `DefaultParser`, data denotes the data in the 1st Packet (w/ type string), while bin denotes binary data
+// in following packets if available;
+// For `MsgpackParser`, bin is not used since all data are packed in a single Packet;
+// args are acquired from reflection, usually in calling `newHandleFn(func)`
 type ArgsUnmarshaler interface {
-	UnmarshalArgs([]reflect.Type, []byte, [][]byte) ([]reflect.Value, error)
+	UnmarshalArgs(args []reflect.Type, data []byte, bin [][]byte) ([]reflect.Value, error)
 }
 
 // Parser provides Encoder and Decoder instance, like a factory

@@ -4,12 +4,19 @@ package engine
 type PacketType byte
 
 const (
+	// PacketTypeOpen is sent from the server when a new transport is opened (recheck)
 	PacketTypeOpen PacketType = iota
+	// PacketTypeClose requests the close of this transport but does not shutdown the connection itself.
 	PacketTypeClose
+	// PacketTypePing is sent by the client. Server should answer with a pong packet containing the same data
 	PacketTypePing
+	// PacketTypePong is sent by the server to respond to ping packets.
 	PacketTypePong
+	// PacketTypeMessage denotes actual message, client and server should call their callbacks with the data.
 	PacketTypeMessage
+	// PacketTypeUpgrade is sent by the client requesting the server to flush its cache on the old transport and switch to the new transport.
 	PacketTypeUpgrade
+	// PacketTypeNoop denotes a noop packet. Used primarily to force a poll cycle when an incoming websocket connection is received.
 	PacketTypeNoop
 )
 
@@ -46,7 +53,9 @@ type Parameters struct {
 type MessageType byte
 
 const (
+	// MessageTypeString indicates Message encoded as string
 	MessageTypeString MessageType = iota
+	// MessageTypeBinary indicates Message encoded as binary
 	MessageTypeBinary
 )
 

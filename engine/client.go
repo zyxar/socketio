@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -11,10 +12,8 @@ import (
 type Client struct {
 	*Socket
 	*eventHandlers
-	pingInterval time.Duration
-	pingTimeout  time.Duration
-	closeChan    chan struct{}
-	once         sync.Once
+	closeChan chan struct{}
+	once      sync.Once
 }
 
 // Dial connects to a engine.io server represented by `rawurl` and create Client instance on success.
@@ -43,8 +42,6 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	c = &Client{
 		Socket:        ß,
 		eventHandlers: newEventHandlers(),
-		pingInterval:  pingInterval,
-		pingTimeout:   pingTimeout,
 		closeChan:     closeChan,
 	}
 
@@ -57,7 +54,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 			case <-time.After(pingInterval):
 			}
 			if err = ß.Emit(EventPing, MessageTypeString, nil); err != nil {
-				println(err.Error())
+				log.Println("emit:", err.Error())
 				return
 			}
 		}
@@ -73,10 +70,11 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 			default:
 			}
 			if p, err = ß.Read(); err != nil {
-				println(err.Error())
+				log.Println("read:", err.Error())
 				return
-			} else {
-				c.handle(ß, p)
+			}
+			if err = c.handle(ß, p); err != nil {
+				log.Println("handle:", err.Error())
 			}
 		}
 	}()

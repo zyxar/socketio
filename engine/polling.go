@@ -18,11 +18,16 @@ import (
 )
 
 var (
-	ErrPollingConnClosed       = errors.New("polling connection closed")
-	ErrPollingConnReadTimeout  = errors.New("polling connection read timeout")
+	// ErrPollingConnClosed implies connection closed; fatal.
+	ErrPollingConnClosed = errors.New("polling connection closed")
+	// ErrPollingConnReadTimeout implies connection read timeout; fatal.
+	ErrPollingConnReadTimeout = errors.New("polling connection read timeout")
+	// ErrPollingConnWriteTimeout implies connection write timeout; fatal.
 	ErrPollingConnWriteTimeout = errors.New("polling connection write timeout")
-	ErrPollingConnPaused       = errors.New("polling connection paused")
-	ErrPollingRequestCanceled  = errors.New("polling request canceled")
+	// ErrPollingConnPaused implies connection paused; temperary.
+	ErrPollingConnPaused = errors.New("polling connection paused")
+	// ErrPollingRequestCanceled implies request canceled; temperary.
+	ErrPollingRequestCanceled = errors.New("polling request canceled")
 )
 
 type pollingConn struct {

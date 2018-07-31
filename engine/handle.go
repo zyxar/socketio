@@ -7,13 +7,20 @@ import (
 type event string
 
 const (
-	EventOpen    event = "open"    // Fired upon successful connection.
-	EventMessage event = "message" // Fired when data is received from the server.
-	EventClose   event = "close"   // Fired upon disconnection. In compliance with the WebSocket API spec, this event may be fired even if the open event does not occur (i.e. due to connection error or close()).
-	EventError   event = "error"   // Fired when an error occurs.
-	EventUpgrade event = "upgrade" // Fired upon upgrade success, after the new transport is set
-	EventPing    event = "ping"    // Fired upon flushing a ping packet (ie: actual packet write out)
-	EventPong    event = "pong"    // Fired upon receiving a pong packet.
+	// EventOpen is fired upon successful connection.
+	EventOpen event = "open"
+	// EventMessage is fired when data is received from the server.
+	EventMessage event = "message"
+	// EventClose is fired upon disconnection. In compliance with the WebSocket API spec, this event may be fired even if the open event does not occur (i.e. due to connection error or close()).
+	EventClose event = "close"
+	// EventError is fired when an error occurs.
+	EventError event = "error"
+	// EventUpgrade is fired upon upgrade success, after the new transport is set
+	EventUpgrade event = "upgrade"
+	// EventPing is fired upon flushing a ping packet (ie: actual packet write out)
+	EventPing event = "ping"
+	// EventPong is fired upon receiving a pong packet.
+	EventPong event = "pong"
 )
 
 // Callback is a Callable func, default event handler

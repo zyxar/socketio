@@ -59,8 +59,9 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 							log.Println("handle:", err.Error())
 							s.fire(ß, EventClose, MessageTypeString, nil)
 							return
-						} else {
-							s.handle(ß, p)
+						}
+						if err = s.handle(ß, p); err != nil {
+							log.Println("handle:", err.Error())
 						}
 					}
 				}()

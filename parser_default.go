@@ -326,12 +326,12 @@ type Bytes struct {
 	Data []byte
 }
 
-// Marshal implements Binary interface
+// MarshalBinary implements encoding.BinaryMarshaler
 func (b Bytes) MarshalBinary() ([]byte, error) {
 	return b.Data[:], nil
 }
 
-// Unmarshal implements Binary interface
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (b *Bytes) UnmarshalBinary(p []byte) error {
 	b.Data = p
 	return nil

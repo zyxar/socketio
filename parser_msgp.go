@@ -88,8 +88,8 @@ func msgpUnmashalArg(i reflect.Value, data []byte) ([]byte, error) {
 	case *time.Duration:
 		var vv int64
 		vv, data, err = msgp.ReadInt64Bytes(data)
-		return data, err
 		*t = time.Duration(vv)
+		return data, err
 	case *time.Time:
 		*t, data, err = msgp.ReadTimeBytes(data)
 		return data, err
