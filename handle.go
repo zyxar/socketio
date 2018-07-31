@@ -14,20 +14,20 @@ type nspHandle struct {
 func newNspHandle(namespace string) *nspHandle {
 	return &nspHandle{
 		eventHandle: eventHandle{
-			handlers: make(map[string]*handleFn),
+			handlers: make(map[string]*callback),
 		},
-		ackHandle: ackHandle{ackmap: make(map[uint64]*handleFn)},
+		ackHandle: ackHandle{ackmap: make(map[uint64]*callback)},
 	}
 }
 
 type eventHandle struct {
-	handlers map[string]*handleFn
+	handlers map[string]*callback
 	mutex    sync.RWMutex
 }
 
 func (e *eventHandle) onEvent(event string, callback interface{}) {
 	e.mutex.Lock()
-	e.handlers[event] = newHandleFn(callback)
+	e.handlers[event] = newCallback(callback)
 	e.mutex.Unlock()
 }
 
@@ -43,7 +43,7 @@ func (e *eventHandle) fireEvent(event string, args []byte, buffer [][]byte, au A
 
 type ackHandle struct {
 	id     uint64
-	ackmap map[uint64]*handleFn
+	ackmap map[uint64]*callback
 	mutex  sync.RWMutex
 }
 
@@ -63,7 +63,7 @@ func (a *ackHandle) fireAck(id uint64, data []byte, buffer [][]byte, au ArgsUnma
 func (a *ackHandle) onAck(callback interface{}) uint64 {
 	id := atomic.AddUint64(&a.id, 1)
 	a.mutex.Lock()
-	a.ackmap[id] = newHandleFn(callback)
+	a.ackmap[id] = newCallback(callback)
 	a.mutex.Unlock()
 	return id
 }

@@ -40,7 +40,7 @@ type Decoder interface {
 // For `DefaultParser`, data denotes the data in the 1st Packet (w/ type string), while bin denotes binary data
 // in following packets if available;
 // For `MsgpackParser`, bin is not used since all data are packed in a single Packet;
-// args are acquired from reflection, usually in calling `newHandleFn(func)`
+// args are acquired from reflection, usually by calling `newCallback(func)`
 type ArgsUnmarshaler interface {
 	UnmarshalArgs(args []reflect.Type, data []byte, bin [][]byte) ([]reflect.Value, error)
 }

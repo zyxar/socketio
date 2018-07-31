@@ -11,7 +11,7 @@ type dummy struct {
 }
 
 func TestHandleFn(t *testing.T) {
-	fn := newHandleFn(func(evt string, buf []byte, dummy *dummy) {
+	fn := newCallback(func(evt string, buf []byte, dummy *dummy) {
 		if evt != "message" {
 			t.Error("message")
 		}
@@ -31,7 +31,7 @@ func TestHandleFn(t *testing.T) {
 func TestBufferHandleFn(t *testing.T) {
 	b1 := []byte{1, 2, 3, 4}
 	b2 := []byte{0, 1, 2, 3}
-	fn := newHandleFn(func(evt string, b *Bytes, c, d string, e *Bytes) {
+	fn := newCallback(func(evt string, b *Bytes, c, d string, e *Bytes) {
 		if evt != "message" || c != "c" || d != "d" {
 			t.Error("handle string error")
 		}
@@ -48,7 +48,7 @@ func TestBufferHandleFn(t *testing.T) {
 }
 
 func TestVariadicCallback(t *testing.T) {
-	ff := newHandleFn(func(a string, b ...int) {
+	ff := newCallback(func(a string, b ...int) {
 		if a != "message" || len(b) != 3 || b[0] != 1 || b[1] != 2 || b[2] != 3 {
 			t.Error("variadict func calling incorrect")
 		}

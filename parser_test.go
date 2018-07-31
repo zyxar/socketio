@@ -188,7 +188,7 @@ func TestMsgpackUnmarshal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		ff := newHandleFn(func(i **uint64) {
+		cb := newCallback(func(i **uint64) {
 			if i == nil {
 				t.Error("unmarshal *pointer incorrect")
 			} else if *i == nil {
@@ -197,19 +197,19 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				t.Error("unmarshal *pointer incorrect")
 			}
 		})
-		in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{ints})
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		ff := newHandleFn(func(i []int) {
+		cb := newCallback(func(i []int) {
 			if len(i) != len(ints) || cap(i) != cap(ints) {
 				t.Error("unmarshal []int incorrect")
 			}
@@ -219,14 +219,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i [10]int) {
+		cb = newCallback(func(i [10]int) {
 			if len(i) != len(ints) || cap(i) != cap(ints) {
 				t.Error("unmarshal []int incorrect")
 			}
@@ -236,14 +236,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i ...int) {
+		cb = newCallback(func(i ...int) {
 			if len(i) != len(ints) || cap(i) != cap(ints) {
 				t.Error("unmarshal ...int incorrect")
 			}
@@ -253,19 +253,19 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.CallSlice(in)
+		cb.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{strings})
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		ff := newHandleFn(func(i []string) {
+		cb := newCallback(func(i []string) {
 			if len(i) != len(strings) || cap(i) != cap(strings) {
 				t.Error("unmarshal [10]string incorrect")
 			}
@@ -275,14 +275,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i [10]string) {
+		cb = newCallback(func(i [10]string) {
 			if len(i) != len(strings) || cap(i) != cap(strings) {
 				t.Error("unmarshal [10]string incorrect")
 			}
@@ -292,14 +292,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i ...string) {
+		cb = newCallback(func(i ...string) {
 			if len(i) != len(strings) || cap(i) != cap(strings) {
 				t.Error("unmarshal ...string incorrect")
 			}
@@ -309,19 +309,19 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.CallSlice(in)
+		cb.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{bytess})
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		ff := newHandleFn(func(i [][]byte) {
+		cb := newCallback(func(i [][]byte) {
 			if len(i) != len(bytess) || cap(i) != cap(bytess) {
 				t.Error("unmarshal [][]byte incorrect")
 			}
@@ -331,14 +331,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i [10][]byte) {
+		cb = newCallback(func(i [10][]byte) {
 			if len(i) != len(bytess) || cap(i) != cap(bytess) {
 				t.Error("unmarshal [10][]byte incorrect")
 			}
@@ -348,14 +348,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i ...[]byte) {
+		cb = newCallback(func(i ...[]byte) {
 			if len(i) != len(bytess) || cap(i) != cap(bytess) {
 				t.Error("unmarshal ...[]byte incorrect")
 			}
@@ -365,19 +365,19 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.CallSlice(in)
+		cb.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{foos})
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		ff := newHandleFn(func(i []foobar) {
+		cb := newCallback(func(i []foobar) {
 			if len(i) != len(foos) || cap(i) != cap(foos) {
 				t.Error("unmarshal []foobar incorrect")
 			}
@@ -387,14 +387,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i [4]foobar) {
+		cb = newCallback(func(i [4]foobar) {
 			if len(i) != len(foos) || cap(i) != cap(foos) {
 				t.Error("unmarshal [4]foobar incorrect")
 			}
@@ -404,14 +404,14 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.Call(in)
+		cb.fn.Call(in)
 
-		ff = newHandleFn(func(i ...foobar) {
+		cb = newCallback(func(i ...foobar) {
 			if len(i) != len(foos) || cap(i) != cap(foos) {
 				t.Error("unmarshal ...foobar incorrect")
 			}
@@ -421,12 +421,12 @@ func TestMsgpackUnmarshal(t *testing.T) {
 				}
 			}
 		})
-		in, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+		in, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 		if err != nil {
 			t.Error(err.Error())
 			return
 		}
-		ff.fn.CallSlice(in)
+		cb.fn.CallSlice(in)
 	}
 	{
 		data, err := msgp.AppendIntf(nil, []interface{}{foos[0]})
@@ -434,15 +434,15 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		ff := newHandleFn(func(i map[string]string) {
+		cb := newCallback(func(i map[string]string) {
 			if i["foo"] != "a" {
 				t.Error("unmarshal map[string]string incorrect", i)
 			}
 		})
-		if in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err != nil {
+		if in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err != nil {
 			t.Error(err.Error())
 		} else {
-			ff.fn.Call(in)
+			cb.fn.Call(in)
 		}
 
 		data, err = msgp.AppendIntf(nil, []interface{}{map[string]interface{}{"foo": 0x1234}})
@@ -450,15 +450,15 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		ff = newHandleFn(func(i map[string]int64) {
+		cb = newCallback(func(i map[string]int64) {
 			if i["foo"] != 0x1234 {
 				t.Error("unmarshal map[string]int64 incorrect", i)
 			}
 		})
-		if in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err != nil {
+		if in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err != nil {
 			t.Error(err.Error())
 		} else {
-			ff.fn.Call(in)
+			cb.fn.Call(in)
 		}
 
 		data, err = msgp.AppendIntf(nil, []interface{}{map[string]interface{}{"foo": float64(1.234)}})
@@ -466,15 +466,15 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		ff = newHandleFn(func(i map[string]float64) {
+		cb = newCallback(func(i map[string]float64) {
 			if i["foo"] != 1.234 {
 				t.Error("unmarshal map[string]float64 incorrect", i)
 			}
 		})
-		if in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err != nil {
+		if in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err != nil {
 			t.Error(err.Error())
 		} else {
-			ff.fn.Call(in)
+			cb.fn.Call(in)
 		}
 
 		data, err = msgp.AppendIntf(nil, []interface{}{map[string]interface{}{"foo": []byte{1, 2, 3, 4}}})
@@ -482,15 +482,15 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		ff = newHandleFn(func(i map[string][]byte) {
+		cb = newCallback(func(i map[string][]byte) {
 			if !bytes.Equal(i["foo"], []byte{1, 2, 3, 4}) {
 				t.Error("unmarshal map[string][]byte incorrect", i)
 			}
 		})
-		if in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err != nil {
+		if in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err != nil {
 			t.Error(err.Error())
 		} else {
-			ff.fn.Call(in)
+			cb.fn.Call(in)
 		}
 	}
 	{
@@ -499,28 +499,28 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		ff := newHandleFn(func(i unsafe.Pointer) {})
-		if _, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+		cb := newCallback(func(i unsafe.Pointer) {})
+		if _, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		ff = newHandleFn(func(i msgp.Unmarshaler) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+		cb = newCallback(func(i msgp.Unmarshaler) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		ff = newHandleFn(func(i struct{}) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+		cb = newCallback(func(i struct{}) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		ff = newHandleFn(func(i chan byte) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+		cb = newCallback(func(i chan byte) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		ff = newHandleFn(func(i func()) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil); err == nil {
+		cb = newCallback(func(i func()) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 	}
@@ -537,7 +537,7 @@ func TestMsgpackUnmarshalArgs(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	ff := newHandleFn(func(i int, j uint32, k int64, b []byte, s string, foo foobar, c complex64, e extfoo, m map[string]interface{}) {
+	cb := newCallback(func(i int, j uint32, k int64, b []byte, s string, foo foobar, c complex64, e extfoo, m map[string]interface{}) {
 		if i != 100 || j != 200 || k != 300 || !bytes.Equal(b, []byte{1, 2, 3, 4}) || s != "string" || c != complex64(400) {
 			t.Error("arguments incorrect")
 		}
@@ -559,12 +559,12 @@ func TestMsgpackUnmarshalArgs(t *testing.T) {
 		}
 	})
 
-	in, err := (msgpackDecoder{}).UnmarshalArgs(ff.args, data, nil)
+	in, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil)
 	if err != nil {
 		t.Error(err.Error())
 		return
 	}
-	ff.fn.Call(in)
+	cb.fn.Call(in)
 }
 
 type extfoo struct{ msgp.RawExtension }
