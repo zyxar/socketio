@@ -8,17 +8,31 @@ import (
 
 type namespace struct {
 	callbacks    map[string]*callback
-	onError      func(so Socket, err ...interface{})
+	onConnect    func(so Socket)
 	onDisconnect func(so Socket)
+	onError      func(so Socket, err ...interface{})
 }
 
+// Namespace is socket.io `namespace` abstraction
 type Namespace interface {
-	OnEvent(event string, callback interface{}) Namespace     // chainable
-	OnDisconnect(fn func(so Socket)) Namespace                // chainable
+	// OnEvent registers event callback:
+	// callback should be a valid function, 1st argument of which could be `socketio.Socket` or omitted;
+	// the event callback would be called when a message received from a client with corresponding event;
+	// upon invocation the corresponding `socketio.Socket` would be supplied if appropriate.
+	OnEvent(event string, callback interface{}) Namespace // chainable
+	// OnConnect registers fn as callback, which would be called when this Namespace is connected by a
+	// client, i.e. upon receiving CONNECT packet (for non-root namespace) or connection establishment
+	// ("/" namespace)
+	OnConnect(fn func(so Socket)) Namespace // chainable
+	// OnDisconnect registers fn as callback, which would be called when this Namespace is disconnected by a
+	// client, i.e. upon receiving DISCONNECT packet or connection lost
+	OnDisconnect(fn func(so Socket)) Namespace // chainable
+	// OnError registers fn as callback, which would be called when error occurs in this Namespace
 	OnError(fn func(so Socket, err ...interface{})) Namespace // chainable
 }
 
 func (e *namespace) OnDisconnect(fn func(so Socket)) Namespace { e.onDisconnect = fn; return e }
+func (e *namespace) OnConnect(fn func(so Socket)) Namespace    { e.onConnect = fn; return e }
 
 func (e *namespace) OnError(fn func(so Socket, err ...interface{})) Namespace {
 	e.onError = fn

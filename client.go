@@ -10,20 +10,18 @@ import (
 type Client struct {
 	engine *engine.Client
 	*socket
-
-	nsps      map[string]*namespace
-	onConnect func(Socket)
-	onError   func(err interface{})
+	nsps    map[string]*namespace
+	onError func(err interface{})
 }
 
 // Dial connects to a socket.io server represented by `rawurl` and create Client instance on success.
-func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser, onConnect func(Socket)) (c *Client, err error) {
+func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (c *Client, err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
 		return
 	}
 	socket := newSocket(e.Socket, parser)
-	c = &Client{engine: e, socket: socket, onConnect: onConnect, nsps: make(map[string]*namespace)}
+	c = &Client{engine: e, socket: socket, nsps: make(map[string]*namespace)}
 	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
@@ -49,6 +47,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	return
 }
 
+// Emit send event messages to namespace `nsp`
 func (c *Client) Emit(nsp string, event string, args ...interface{}) (err error) {
 	return c.socket.emit(nsp, event, args...)
 }
@@ -68,6 +67,7 @@ func (c *Client) OnError(fn func(interface{})) {
 	c.onError = fn
 }
 
+// Namespace ensures a Namespace instance exists in client
 func (c *Client) Namespace(nsp string) Namespace { return c.creatensp(nsp) }
 
 func (c *Client) creatensp(nsp string) *namespace {
@@ -91,8 +91,8 @@ func (c *Client) process(sock *socket, p *Packet) {
 	switch p.Type {
 	case PacketTypeConnect:
 		sock.attachnsp(p.Namespace)
-		if c.onConnect != nil {
-			c.onConnect(&nspSock{socket: sock, name: p.Namespace})
+		if nsp.onConnect != nil {
+			nsp.onConnect(&nspSock{socket: sock, name: p.Namespace})
 		}
 	case PacketTypeDisconnect:
 		sock.detachnsp(p.Namespace)

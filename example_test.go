@@ -10,28 +10,26 @@ import (
 )
 
 func ExampleDial() {
-	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser,
-		func(so socketio.Socket) {
-			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
-			if err := so.Emit("binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
-				log.Println("Emit:", err)
-			}
-		})
+	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
 	defer c.Close()
-	var onDisconnect = func(so socketio.Socket) {
-		log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
-	}
 
-	var onError = func(so socketio.Socket, err ...interface{}) {
-		log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
-	}
 	c.Namespace("/").
-		OnDisconnect(onDisconnect).
-		OnError(onError).
+		OnConnect(func(so socketio.Socket) {
+			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
+			if err := so.Emit("binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
+				log.Println("so.Emit:", err)
+			}
+		}).
+		OnDisconnect(func(so socketio.Socket) {
+			log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
+		}).
+		OnError(func(so socketio.Socket, err ...interface{}) {
+			log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
+		}).
 		OnEvent("event", func(message string, b socketio.Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%s => %x", message, bb)
@@ -42,7 +40,7 @@ func ExampleDial() {
 		if err := c.Emit("/", "foobar", "foo", func(a, b string) {
 			log.Println("foobar =>", a, b)
 		}); err != nil {
-			log.Println(err)
+			log.Println("c.Emit:", err)
 			break
 		}
 	}
@@ -50,7 +48,8 @@ func ExampleDial() {
 
 func ExampleServer() {
 	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
-	server.OnConnect(func(so socketio.Socket) {
+	var onConnect = func(so socketio.Socket) {
+		log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
 		go func() {
 			for {
 				<-time.After(time.Second * 2)
@@ -61,7 +60,7 @@ func ExampleServer() {
 			}
 		}()
 		so.Emit("event", "hello world!")
-	})
+	}
 
 	var onDisconnect = func(so socketio.Socket) {
 		log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
@@ -72,6 +71,7 @@ func ExampleServer() {
 	}
 
 	server.Namespace("/").
+		OnConnect(onConnect).
 		OnDisconnect(onDisconnect).
 		OnError(onError).
 		OnEvent("message", func(so socketio.Socket, data string) {
@@ -92,6 +92,9 @@ func ExampleServer() {
 		})
 
 	server.Namespace("/ditto").
+		OnConnect(func(so socketio.Socket) {
+			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
+		}).
 		OnDisconnect(onDisconnect).
 		OnError(onError).
 		OnEvent("disguise", func(msg interface{}, b socketio.Bytes) {
@@ -99,8 +102,8 @@ func ExampleServer() {
 			log.Printf("%v: %x", msg, bb)
 		})
 
-	server.OnError(func(so socketio.Socket, err error) {
-		log.Printf("%v error=> %v", so.RemoteAddr(), err)
+	server.OnError(func(err error) {
+		log.Printf("server error: %v", err)
 	})
 	defer server.Close()
 	log.Fatalln(http.ListenAndServe("localhost:8081", server))
