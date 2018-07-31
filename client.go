@@ -14,14 +14,20 @@ type Client struct {
 	onError func(err interface{})
 }
 
+// NewClient creates a Client instance; use Dial to initialize underlying network
+func NewClient() (c *Client) {
+	return &Client{nsps: make(map[string]*namespace)}
+}
+
 // Dial connects to a socket.io server represented by `rawurl` and create Client instance on success.
-func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (c *Client, err error) {
+func (c *Client) Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (err error) {
 	e, err := engine.Dial(rawurl, requestHeader, dialer)
 	if err != nil {
 		return
 	}
 	socket := newSocket(e.Socket, parser)
-	c = &Client{engine: e, socket: socket, nsps: make(map[string]*namespace)}
+	c.engine = e
+	c.socket = socket
 	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {
 		case engine.MessageTypeString:
@@ -43,7 +49,6 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 		socket.Close()
 		detachall(c, socket)
 	}))
-
 	return
 }
 

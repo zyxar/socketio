@@ -10,13 +10,7 @@ import (
 )
 
 func ExampleDial() {
-	c, err := socketio.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-	defer c.Close()
-
+	c := socketio.NewClient()
 	c.Namespace("/").
 		OnConnect(func(so socketio.Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
@@ -34,6 +28,13 @@ func ExampleDial() {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%s => %x", message, bb)
 		})
+
+	err := c.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	defer c.Close()
 
 	for {
 		<-time.After(time.Second * 2)
