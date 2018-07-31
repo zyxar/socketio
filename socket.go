@@ -112,7 +112,7 @@ func (s *socket) Emit(event string, args ...interface{}) (err error) {
 func (s *socket) EmitError(arg interface{}) (err error) { return s.emitError("/", arg) }
 
 // Namespace implements Socket.Namespace
-func (socket) Namespace() string { return "/" }
+func (*socket) Namespace() string { return "/" }
 
 func (s *socket) emit(nsp string, event string, args ...interface{}) (err error) {
 	s.mutex.RLock()
