@@ -21,16 +21,17 @@ type Server struct {
 // NewServer creates a socket.io server instance upon underlying engine.io transport
 func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
 	e, err := engine.NewServer(interval, timeout, func(ß *engine.Socket) {
-		socket := newServerSocket(ß, parser)
+		socket := newSocket(ß, parser)
+		socket.attachnsp("/")
 		if server.onConnect != nil {
-			server.onConnect(&nspSock{socket, "/"})
+			server.onConnect(socket)
 		}
 		if err := socket.emitPacket(&Packet{
 			Type:      PacketTypeConnect,
 			Namespace: "/",
 		}); err != nil {
 			if server.onError != nil {
-				server.onError(&nspSock{socket, "/"}, err)
+				server.onError(socket, err)
 			}
 		}
 		server.sockLock.Lock()

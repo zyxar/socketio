@@ -49,7 +49,7 @@ func ExampleServer() {
 			for {
 				<-time.After(time.Second * 2)
 				if err := so.Emit("event", "check it out!", time.Now()); err != nil {
-					log.Println(err)
+					log.Println("emit:", err)
 					return
 				}
 			}
@@ -73,7 +73,7 @@ func ExampleServer() {
 				bb, _ := b.MarshalBinary()
 				log.Printf("%s=> %x", msg, bb)
 			}); err != nil {
-				log.Println(err)
+				log.Println("emit:", err)
 			}
 		}).
 		OnEvent("binary", func(data interface{}, b socketio.Bytes) {

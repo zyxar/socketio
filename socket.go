@@ -31,12 +31,15 @@ type nspSock struct {
 	name string
 }
 
+// Namespace implements Socket.Namespace
 func (n *nspSock) Namespace() string { return n.name }
 
+// Emit implements Socket.Emit
 func (n *nspSock) Emit(event string, args ...interface{}) (err error) {
 	return n.socket.emit(n.name, event, args...)
 }
 
+// EmitError implements Socket.EmitError
 func (n *nspSock) EmitError(arg interface{}) (err error) {
 	return n.socket.emitError(n.name, arg)
 }
@@ -49,20 +52,7 @@ type socket struct {
 	mutex   sync.RWMutex
 }
 
-func newServerSocket(ß *engine.Socket, parser Parser) *socket {
-	encoder := parser.Encoder()
-	decoder := parser.Decoder()
-	socket := &socket{
-		ß:       ß,
-		encoder: encoder,
-		decoder: decoder,
-		acks:    make(map[string]*ackHandle),
-	}
-	socket.attachnsp("/")
-	return socket
-}
-
-func newClientSocket(ß *engine.Socket, parser Parser) *socket {
+func newSocket(ß *engine.Socket, parser Parser) *socket {
 	return &socket{
 		ß:       ß,
 		encoder: parser.Encoder(),
@@ -113,6 +103,17 @@ func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au
 	return
 }
 
+// Emit implements Socket.Emit
+func (s *socket) Emit(event string, args ...interface{}) (err error) {
+	return s.emit("/", event, args...)
+}
+
+// EmitError implements Socket.EmitError
+func (s *socket) EmitError(arg interface{}) (err error) { return s.emitError("/", arg) }
+
+// Namespace implements Socket.Namespace
+func (socket) Namespace() string { return "/" }
+
 func (s *socket) emit(nsp string, event string, args ...interface{}) (err error) {
 	s.mutex.RLock()
 	ack, ok := s.acks[nsp]
@@ -121,10 +122,7 @@ func (s *socket) emit(nsp string, event string, args ...interface{}) (err error)
 		return ErrorNamespaceUnavaialble
 	}
 	data := []interface{}{event}
-	p := &Packet{
-		Type:      PacketTypeEvent,
-		Namespace: nsp,
-	}
+	p := &Packet{Type: PacketTypeEvent, Namespace: nsp}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); t.Kind() == reflect.Func {
 			p.ID = newid(ack.onAck(args[i]))

@@ -22,7 +22,7 @@ func Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser
 	if err != nil {
 		return
 	}
-	socket := newClientSocket(e.Socket, parser)
+	socket := newSocket(e.Socket, parser)
 	c = &Client{engine: e, socket: socket, onConnect: onConnect}
 	e.On(engine.EventMessage, engine.Callback(func(_ *engine.Socket, msgType engine.MessageType, data []byte) {
 		switch msgType {

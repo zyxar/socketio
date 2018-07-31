@@ -180,7 +180,7 @@ func TestMsgpackUnmarshal(t *testing.T) {
 	ints := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
 	strings := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
 	bytess := [][]byte{{1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {0}}
-	foos := []*foobar{{"a"}, {"b"}, {"c"}, {"d"}}
+	foos := []*foobar{{Foo: "a"}, {Foo: "b"}, {Foo: "c"}, {Foo: "d"}}
 	ptr := newid(12345)
 
 	{
