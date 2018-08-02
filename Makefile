@@ -19,3 +19,6 @@ install: install-$(shell $(GO) env GOOS)
 
 test:
 	$(GO) test -v -race -cover
+
+bench:
+	@$(GO) test -v -bench=. -run=X
