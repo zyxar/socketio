@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 	"unsafe"
 
@@ -499,28 +500,37 @@ func TestMsgpackUnmarshal(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		cb := newCallback(func(i unsafe.Pointer) {})
-		if _, err := (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
+		var argsOf = func(fn interface{}) []reflect.Type {
+			t := reflect.TypeOf(fn)
+			args := make([]reflect.Type, t.NumIn())
+			for i := 0; i < t.NumIn(); i++ {
+				args[i] = t.In(i)
+			}
+			return args
+		}
+
+		args := argsOf(func(i unsafe.Pointer) {})
+		if _, err := (msgpackDecoder{}).UnmarshalArgs(args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		cb = newCallback(func(i msgp.Unmarshaler) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
+		args = argsOf(func(i msgp.Unmarshaler) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		cb = newCallback(func(i struct{}) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
+		args = argsOf(func(i struct{}) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		cb = newCallback(func(i chan byte) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
+		args = argsOf(func(i chan byte) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 
-		cb = newCallback(func(i func()) {})
-		if _, err = (msgpackDecoder{}).UnmarshalArgs(cb.args, data, nil); err == nil {
+		args = argsOf(func(i func()) {})
+		if _, err = (msgpackDecoder{}).UnmarshalArgs(args, data, nil); err == nil {
 			t.Error("unmarshal should return error")
 		}
 	}

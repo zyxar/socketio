@@ -3,6 +3,7 @@ package socketio
 import (
 	"bytes"
 	"testing"
+	"unsafe"
 )
 
 type dummy struct {
@@ -83,4 +84,59 @@ func TestVariadicCallback(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 	}
+}
+
+func TestCallbackInvalid(t *testing.T) {
+	t.Parallel()
+	t.Run("Chan", func(tt *testing.T) {
+		defer func() {
+			if e := recover(); e == nil {
+				tt.Error("should recover from panic")
+			}
+		}()
+		newCallback(func(chan int) {})
+	})
+	t.Run("Func", func(tt *testing.T) {
+		defer func() {
+			if e := recover(); e == nil {
+				tt.Error("should recover from panic")
+			}
+		}()
+		newCallback(func(func(int) bool) {})
+	})
+	t.Run("UnsafePointer", func(tt *testing.T) {
+		defer func() {
+			if e := recover(); e == nil {
+				tt.Error("should recover from panic")
+			}
+		}()
+		newCallback(func(unsafe.Pointer) {})
+	})
+}
+
+func TestCallbackSanity(t *testing.T) {
+	t.Parallel()
+	t.Run("Bool", func(tt *testing.T) { newCallback(func(bool) {}) })
+	t.Run("Int", func(tt *testing.T) { newCallback(func(int) {}) })
+	t.Run("Int8", func(tt *testing.T) { newCallback(func(int8) {}) })
+	t.Run("Int16", func(tt *testing.T) { newCallback(func(int16) {}) })
+	t.Run("Int32", func(tt *testing.T) { newCallback(func(int32) {}) })
+	t.Run("Int64", func(tt *testing.T) { newCallback(func(int64) {}) })
+	t.Run("Uint", func(tt *testing.T) { newCallback(func(uint) {}) })
+	t.Run("Uint8", func(tt *testing.T) { newCallback(func(uint8) {}) })
+	t.Run("Uint16", func(tt *testing.T) { newCallback(func(uint16) {}) })
+	t.Run("Uint32", func(tt *testing.T) { newCallback(func(uint32) {}) })
+	t.Run("Uint64", func(tt *testing.T) { newCallback(func(uint64) {}) })
+	t.Run("Uintptr", func(tt *testing.T) { newCallback(func(uintptr) {}) })
+	t.Run("Float32", func(tt *testing.T) { newCallback(func(float32) {}) })
+	t.Run("Float64", func(tt *testing.T) { newCallback(func(float64) {}) })
+	t.Run("Complex64", func(tt *testing.T) { newCallback(func(complex64) {}) })
+	t.Run("Complex128", func(tt *testing.T) { newCallback(func(complex128) {}) })
+	t.Run("Array", func(tt *testing.T) { newCallback(func([8]int) {}) })
+	t.Run("Interface", func(tt *testing.T) { newCallback(func(interface{}) {}) })
+	t.Run("Map", func(tt *testing.T) { newCallback(func(map[string]int) {}) })
+	t.Run("Ptr", func(tt *testing.T) { newCallback(func(*interface{}) {}) })
+	t.Run("Slice", func(tt *testing.T) { newCallback(func([]byte) {}) })
+	t.Run("String", func(tt *testing.T) { newCallback(func(string) {}) })
+	t.Run("Struct", func(tt *testing.T) { newCallback(func(struct{}) {}) })
 }

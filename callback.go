@@ -17,6 +17,10 @@ func newCallback(fn interface{}) *callback {
 	t := v.Type()
 	args := make([]reflect.Type, t.NumIn())
 	for i := 0; i < t.NumIn(); i++ {
+		switch t.In(i).Kind() {
+		case reflect.Invalid, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+			panic("invalid callback argument " + t.In(i).String())
+		}
 		args[i] = t.In(i)
 	}
 	return &callback{fn: v, args: args}
