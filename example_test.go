@@ -1,37 +1,36 @@
-package socketio_test
+package socketio
 
 import (
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/zyxar/socketio"
 	"github.com/zyxar/socketio/engine"
 
 	"github.com/tinylib/msgp/msgp"
 )
 
 func ExampleDial() {
-	c := socketio.NewClient()
+	c := NewClient()
 	c.Namespace("/").
-		OnConnect(func(so socketio.Socket) {
+		OnConnect(func(so Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
-			if err := so.Emit("binary", "bytes", &socketio.Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
+			if err := so.Emit("binary", "bytes", &Bytes{Data: []byte{1, 2, 3, 4, 5, 6}}); err != nil {
 				log.Println("so.Emit:", err)
 			}
 		}).
-		OnDisconnect(func(so socketio.Socket) {
+		OnDisconnect(func(so Socket) {
 			log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
 		}).
-		OnError(func(so socketio.Socket, err ...interface{}) {
+		OnError(func(so Socket, err ...interface{}) {
 			log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
 		}).
-		OnEvent("event", func(message string, b socketio.Bytes) {
+		OnEvent("event", func(message string, b Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%s => %x", message, bb)
 		})
 
-	err := c.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, socketio.DefaultParser)
+	err := c.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, DefaultParser)
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -50,8 +49,8 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.DefaultParser)
-	var onConnect = func(so socketio.Socket) {
+	server, _ := NewServer(time.Second*5, time.Second*5, DefaultParser)
+	var onConnect = func(so Socket) {
 		log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
 		go func() {
 			for {
@@ -65,11 +64,11 @@ func ExampleServer() {
 		so.Emit("event", "hello world!")
 	}
 
-	var onDisconnect = func(so socketio.Socket) {
+	var onDisconnect = func(so Socket) {
 		log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
 	}
 
-	var onError = func(so socketio.Socket, err ...interface{}) {
+	var onError = func(so Socket, err ...interface{}) {
 		log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
 	}
 
@@ -77,15 +76,15 @@ func ExampleServer() {
 		OnConnect(onConnect).
 		OnDisconnect(onDisconnect).
 		OnError(onError).
-		OnEvent("message", func(so socketio.Socket, data string) {
-			if err := so.Emit("ack", "woot", func(msg string, b *socketio.Bytes) {
+		OnEvent("message", func(so Socket, data string) {
+			if err := so.Emit("ack", "woot", func(msg string, b *Bytes) {
 				bb, _ := b.MarshalBinary()
 				log.Printf("%s=> %x", msg, bb)
 			}); err != nil {
 				log.Println("emit:", err)
 			}
 		}).
-		OnEvent("binary", func(data interface{}, b socketio.Bytes) {
+		OnEvent("binary", func(data interface{}, b Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%s <- %x", data, bb)
 		}).
@@ -95,12 +94,12 @@ func ExampleServer() {
 		})
 
 	server.Namespace("/ditto").
-		OnConnect(func(so socketio.Socket) {
+		OnConnect(func(so Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
 		}).
 		OnDisconnect(onDisconnect).
 		OnError(onError).
-		OnEvent("disguise", func(msg interface{}, b socketio.Bytes) {
+		OnEvent("disguise", func(msg interface{}, b Bytes) {
 			bb, _ := b.MarshalBinary()
 			log.Printf("%v: %x", msg, bb)
 		})
@@ -112,20 +111,20 @@ func ExampleServer() {
 	log.Fatalln(http.ListenAndServe("localhost:8081", server))
 }
 
-func ExampleServer2() {
-	server, _ := socketio.NewServer(time.Second*5, time.Second*5, socketio.MsgpackParser)
+func ExampleServer_withMsgpackParser() {
+	server, _ := NewServer(time.Second*5, time.Second*5, MsgpackParser)
 	server.Namespace("/").
-		OnConnect(func(so socketio.Socket) {
+		OnConnect(func(so Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
 			so.Emit("event", "hello world!", time.Now())
 		}).
-		OnDisconnect(func(so socketio.Socket) {
+		OnDisconnect(func(so Socket) {
 			log.Printf("%v %v %q disconnected", so.Sid(), so.RemoteAddr(), so.Namespace())
 		}).
 		OnEvent("message", func(b msgp.Raw, data foobar) {
 			log.Printf("%x %v", b, data)
 		}).
-		OnError(func(so socketio.Socket, err ...interface{}) {
+		OnError(func(so Socket, err ...interface{}) {
 			log.Println("socket", so.Sid(), so.RemoteAddr(), so.Namespace(), "error:", err)
 		})
 	server.OnError(func(err error) {
@@ -133,56 +132,4 @@ func ExampleServer2() {
 	})
 	defer server.Close()
 	log.Fatalln(http.ListenAndServe("localhost:8081", server))
-}
-
-type foobar struct {
-	Foo string `msg:"foo"`
-}
-
-// MarshalMsg implements msgp.Marshaler
-func (z foobar) MarshalMsg(b []byte) (o []byte, err error) {
-	o = msgp.Require(b, z.Msgsize())
-	// map header, size 1
-	// string "foo"
-	o = append(o, 0x81, 0xa3, 0x66, 0x6f, 0x6f)
-	o = msgp.AppendString(o, z.Foo)
-	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *foobar) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	var field []byte
-	_ = field
-	var zb0001 uint32
-	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
-	if err != nil {
-		return
-	}
-	for zb0001 > 0 {
-		zb0001--
-		field, bts, err = msgp.ReadMapKeyZC(bts)
-		if err != nil {
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		case "foo":
-			z.Foo, bts, err = msgp.ReadStringBytes(bts)
-			if err != nil {
-				return
-			}
-		default:
-			bts, err = msgp.Skip(bts)
-			if err != nil {
-				return
-			}
-		}
-	}
-	o = bts
-	return
-}
-
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z foobar) Msgsize() (s int) {
-	s = 1 + 4 + msgp.StringPrefixSize + len(z.Foo)
-	return
 }

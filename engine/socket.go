@@ -27,9 +27,7 @@ func newSocket(conn Conn, readTimeout, writeTimeout time.Duration, id string) *S
 		readTimeout:  readTimeout,
 		writeTimeout: writeTimeout,
 		id:           id}
-	emitter := newEmitter(so, 8)
-	go emitter.loop()
-	so.emitter = emitter
+	so.emitter = newEmitter(so, 8)
 	pauseChan := make(chan struct{})
 	close(pauseChan)
 	so.barrier.Store(pauseChan)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -13,18 +14,23 @@ type emitter struct {
 	so      *Socket
 	packets chan *Packet
 	done    chan struct{}
+	wg      sync.WaitGroup
 }
 
 func newEmitter(so *Socket, bufSize int) *emitter {
-	return &emitter{
+	e := &emitter{
 		so:      so,
 		packets: make(chan *Packet, bufSize),
 		done:    make(chan struct{}),
 	}
+	e.wg.Add(1)
+	go e.loop()
+	return e
 }
 
 func (e *emitter) close() {
 	close(e.done)
+	e.wg.Wait()
 }
 func (e *emitter) submit(p *Packet) error {
 	select {
@@ -41,6 +47,8 @@ func (e *emitter) submit(p *Packet) error {
 }
 
 func (e *emitter) loop() {
+	defer e.wg.Done()
+	defer e.flush()
 	for {
 		select {
 		case <-e.done:
@@ -56,6 +64,21 @@ func (e *emitter) loop() {
 			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
 			e.so.WritePacket(p)
 			e.so.RUnlock()
+		}
+	}
+}
+
+func (e *emitter) flush() {
+	for {
+		select {
+		case p := <-e.packets:
+			e.so.CheckPaused()
+			e.so.RLock()
+			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
+			e.so.WritePacket(p)
+			e.so.RUnlock()
+		default:
+			return
 		}
 	}
 }

@@ -1,5 +1,3 @@
 github.com/gorilla/websocket v1.2.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/philhofer/fwd v1.0.0/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
-github.com/zyxar/socketio/engine v0.0.0-20180730073856-fb961f0e915a h1:nrcoK21ZFRuC3I/6szzjEkyrJq2NR6yfbZhO1gv0zr0=
-github.com/zyxar/socketio/engine v0.0.0-20180730073856-fb961f0e915a/go.mod h1:V0lau6d1tkNbOexJuxZ40ey0rMfxzpYk3N/laq7nyi8=
