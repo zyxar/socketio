@@ -1,13 +1,10 @@
 sudo: false
 language: go
 go:
-- "1.10.x"
+- "1.11.x"
 - master
 
 install: true
-
-before_script:
-  - go get -u golang.org/x/vgo
 
 script:
   - make test -C ./engine
@@ -15,3 +12,6 @@ script:
 
 notifications:
   email: false
+
+env:
+  - GO111MODULE=on

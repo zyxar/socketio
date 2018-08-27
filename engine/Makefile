@@ -1,4 +1,4 @@
-GO          = vgo
+GO          = go
 GOARCH     := amd64
 
 all: $(shell $(GO) env GOOS)
