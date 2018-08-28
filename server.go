@@ -188,3 +188,7 @@ func (s *Server) process(sock *socket, p *Packet) {
 		}
 	}
 }
+
+var (
+	WebsocketTransport = engine.WebsocketTransport
+)

@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zyxar/socketio/engine"
-
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -30,7 +28,7 @@ func ExampleDial() {
 			log.Printf("%s => %x", message, bb)
 		})
 
-	err := c.Dial("ws://localhost:8081/socket.io/", nil, engine.WebsocketTransport, DefaultParser)
+	err := c.Dial("ws://localhost:8081/socket.io/", nil, WebsocketTransport, DefaultParser)
 	if err != nil {
 		log.Println(err.Error())
 		return
