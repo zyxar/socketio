@@ -6,6 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyxar/socketio)](https://goreportcard.com/report/github.com/zyxar/socketio)
 [![license](https://img.shields.io/badge/license-New%20BSD-ff69b4.svg)](https://github.com/zyxar/socketio/blob/master/LICENSE)
 [![Build Status](https://travis-ci.org/zyxar/socketio.svg?branch=master)](https://travis-ci.org/zyxar/socketio)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fzyxar%2Fsocketio.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fzyxar%2Fsocketio?ref=badge_shield)
 
 
 ## Install
@@ -259,3 +260,7 @@ server {
 }
 
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fzyxar%2Fsocketio.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fzyxar%2Fsocketio?ref=badge_large)
