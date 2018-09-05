@@ -11,7 +11,7 @@
 ## Install
 
 ```shell
-vgo get -v -u github.com/zyxar/socketio
+go get -v -u github.com/zyxar/socketio
 ```
 
 ## Features
