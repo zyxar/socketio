@@ -40,6 +40,7 @@ type pollingConn struct {
 	paused        atomic.Value
 	localAddr     netAddr
 	remoteAddr    netAddr
+	header        http.Header
 }
 
 func (p *pollingConn) Close() error {
@@ -50,27 +51,27 @@ func (p *pollingConn) Close() error {
 }
 
 // newPollingConn creates an instance of polling connection
-func newPollingConn(bufSize int, localAddr, remoteAddr string) *pollingConn {
+func newPollingConn(bufSize int, localAddr, remoteAddr string, header http.Header) *pollingConn {
 	p := &pollingConn{
 		in:         make(chan *Packet, bufSize),
 		out:        make(chan *Packet, bufSize),
 		closed:     make(chan struct{}),
 		localAddr:  netAddr{addr: localAddr},
 		remoteAddr: netAddr{addr: remoteAddr},
+		header:     cloneHTTPHeader(header),
 	}
 	p.paused.Store(make(chan struct{}))
 	return p
 }
 
 // LocalAddr returns the local network address.
-func (p *pollingConn) LocalAddr() net.Addr {
-	return p.localAddr
-}
+func (p *pollingConn) LocalAddr() net.Addr { return p.localAddr }
 
 // RemoteAddr returns the remote network address.
-func (p *pollingConn) RemoteAddr() net.Addr {
-	return p.remoteAddr
-}
+func (p *pollingConn) RemoteAddr() net.Addr { return p.remoteAddr }
+
+// GetHeader returns the value in http header from client request specified by `key`
+func (p *pollingConn) GetHeader(key string) string { return p.header.Get(key) }
 
 func (p *pollingConn) ReadPacket() (*Packet, error) {
 	if p.isClosed() {
@@ -295,7 +296,7 @@ func (n netAddr) String() string {
 	return n.addr
 }
 
-var _ Conn = newPollingConn(1, "", "")
+var _ Conn = newPollingConn(1, "", "", nil)
 
 func writeJSONP(w http.ResponseWriter, jsonp string, wt io.WriterTo) error {
 	var buf bytes.Buffer

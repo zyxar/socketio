@@ -4,24 +4,25 @@ import (
 	"bytes"
 	"io"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 type websocketConn struct {
-	conn *websocket.Conn
+	conn   *websocket.Conn
+	header http.Header
 }
 
 // LocalAddr returns the local network address.
-func (w *websocketConn) LocalAddr() net.Addr {
-	return w.conn.LocalAddr()
-}
+func (w *websocketConn) LocalAddr() net.Addr { return w.conn.LocalAddr() }
 
 // RemoteAddr returns the remote network address.
-func (w *websocketConn) RemoteAddr() net.Addr {
-	return w.conn.RemoteAddr()
-}
+func (w *websocketConn) RemoteAddr() net.Addr { return w.conn.RemoteAddr() }
+
+// GetHeader returns the value in http header from client request specified by `key`
+func (w *websocketConn) GetHeader(key string) string { return w.header.Get(key) }
 
 func (w *websocketConn) nextWriter(msgType MessageType, pt PacketType) (io.WriteCloser, error) {
 	var m int

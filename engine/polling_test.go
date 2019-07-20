@@ -8,7 +8,7 @@ import (
 
 func TestPollingConn(t *testing.T) {
 	var err error
-	conn := newPollingConn(0, "", "")
+	conn := newPollingConn(0, "", "", nil)
 	defer conn.Close()
 
 	if err = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 10)); err != nil {

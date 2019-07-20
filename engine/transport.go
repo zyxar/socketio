@@ -41,6 +41,7 @@ type Conn interface {
 	Resume() error
 	LocalAddr() net.Addr
 	RemoteAddr() net.Addr
+	GetHeader(key string) string
 }
 
 func getTransport(name string) Transport {
@@ -92,8 +93,7 @@ func (t *websocketTransport) Accept(w http.ResponseWriter, r *http.Request) (Con
 	if err != nil {
 		return nil, err
 	}
-
-	return &websocketConn{conn: c}, nil
+	return &websocketConn{conn: c, header: cloneHTTPHeader(r.Header)}, nil
 }
 
 func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Conn, error) {
@@ -113,14 +113,23 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 	if err != nil {
 		return nil, err
 	}
+	return &websocketConn{conn: c, header: cloneHTTPHeader(requestHeader)}, nil
+}
 
-	return &websocketConn{conn: c}, nil
+func cloneHTTPHeader(h http.Header) http.Header {
+	h2 := make(http.Header, len(h))
+	for k, vv := range h {
+		vv2 := make([]string, len(vv))
+		copy(vv2, vv)
+		h2[k] = vv2
+	}
+	return h2
 }
 
 type pollingAcceptor struct{}
 
 func (pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
-	return newPollingConn(8, r.Host, r.RemoteAddr), nil
+	return newPollingConn(8, r.Host, r.RemoteAddr, r.Header), nil
 }
 
 // PollingAcceptor is an Acceptor instance for polling
