@@ -222,7 +222,7 @@ func (p *pollingConn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = writeXHR2(w, pkt.packet2())
 		}
 		if err != nil {
-			log.Println("polling:", err.Error())
+			log.Println("engine.io polling:", err.Error())
 		}
 	case "POST":
 		var payload Payload

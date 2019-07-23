@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -28,7 +29,7 @@ func ExampleDial() {
 			log.Printf("%s => %x", message, bb)
 		})
 
-	err := c.Dial("ws://localhost:8081/socket.io/", nil, WebsocketTransport, DefaultParser)
+	err := c.Dial(context.Background(), "ws://localhost:8081/socket.io/", nil, WebsocketTransport, DefaultParser)
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -47,7 +48,7 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := NewServer(time.Second*5, time.Second*5, DefaultParser)
+	server, _ := NewServer(context.Background(), time.Second*5, time.Second*5, DefaultParser)
 	var onConnect = func(so Socket) {
 		log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())
 		go func() {
@@ -110,7 +111,7 @@ func ExampleServer() {
 }
 
 func ExampleServer_withMsgpackParser() {
-	server, _ := NewServer(time.Second*5, time.Second*5, MsgpackParser)
+	server, _ := NewServer(context.Background(), time.Second*5, time.Second*5, MsgpackParser)
 	server.Namespace("/").
 		OnConnect(func(so Socket) {
 			log.Println("connected:", so.RemoteAddr(), so.Sid(), so.Namespace())

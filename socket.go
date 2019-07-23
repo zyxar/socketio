@@ -120,6 +120,9 @@ func (s *socket) emit(nsp string, event string, args ...interface{}) (err error)
 	ack, ok := s.acks[nsp]
 	s.mutex.RUnlock()
 	if !ok {
+		if err = s.ß.ContextErr(); err != nil {
+			return
+		}
 		return ErrorNamespaceUnavaialble
 	}
 	data := []interface{}{event}

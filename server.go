@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -18,8 +19,8 @@ type Server struct {
 }
 
 // NewServer creates a socket.io server instance upon underlying engine.io transport
-func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
-	e, err := engine.NewServer(interval, timeout, func(ß *engine.Socket) {
+func NewServer(ctx context.Context, interval, timeout time.Duration, parser Parser) (server *Server, err error) {
+	e, err := engine.NewServer(ctx, interval, timeout, func(ß *engine.Socket) {
 		socket := newSocket(ß, parser)
 		socket.attachnsp("/")
 		nsp := server.creatensp("/")

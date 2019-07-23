@@ -1,13 +1,14 @@
 package engine
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
 )
 
 func ExampleDial() {
-	c, err := Dial("ws://localhost:8080/engine.io/", nil, WebsocketTransport)
+	c, err := Dial(context.Background(), "ws://localhost:8080/engine.io/", nil, WebsocketTransport)
 	if err != nil {
 		log.Printf("dial err=%s", err)
 		return
@@ -17,7 +18,7 @@ func ExampleDial() {
 }
 
 func ExampleServer() {
-	server, _ := NewServer(time.Second*5, time.Second*5, func(so *Socket) {
+	server, _ := NewServer(context.Background(), time.Second*5, time.Second*5, func(so *Socket) {
 		log.Println("connect", so.RemoteAddr())
 	})
 	server.On(EventMessage, Callback(func(so *Socket, typ MessageType, data []byte) {

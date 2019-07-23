@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,12 +13,12 @@ import (
 type Client struct {
 	*Socket
 	*eventHandlers
-	closeChan chan struct{}
-	once      sync.Once
+	once   sync.Once
+	cancel context.CancelFunc
 }
 
 // Dial connects to a engine.io server represented by `rawurl` and create Client instance on success.
-func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, err error) {
+func Dial(ctx context.Context, rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, err error) {
 	conn, err := dialer.Dial(rawurl, requestHeader)
 	if err != nil {
 		return
@@ -37,24 +38,28 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 	pingInterval := time.Duration(param.PingInterval) * time.Millisecond
 	pingTimeout := time.Duration(param.PingTimeout) * time.Millisecond
 
-	closeChan := make(chan struct{}, 1)
-	ß := newSocket(conn, pingInterval+pingTimeout, pingTimeout, param.SID)
+	ctx, cancel := context.WithCancel(ctx)
+	ß := newSocket(ctx, conn, pingInterval+pingTimeout, pingTimeout, param.SID)
 	c = &Client{
 		Socket:        ß,
 		eventHandlers: newEventHandlers(),
-		closeChan:     closeChan,
+		cancel:        cancel,
 	}
 
 	go func() {
 		var err error
 		for {
 			select {
-			case <-closeChan:
+			case <-ctx.Done():
 				return
 			case <-time.After(pingInterval):
 			}
 			if err = ß.Emit(EventPing, MessageTypeString, nil); err != nil {
-				log.Println("emit:", err.Error())
+				select {
+				case <-ctx.Done():
+				default:
+					log.Println("engine.io emit:", err.Error())
+				}
 				return
 			}
 		}
@@ -65,16 +70,26 @@ func Dial(rawurl string, requestHeader http.Header, dialer Dialer) (c *Client, e
 		var err error
 		for {
 			select {
-			case <-closeChan:
+			case <-ctx.Done():
 				return
 			default:
 			}
 			if p, err = ß.Read(); err != nil {
-				log.Println("read:", err.Error())
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				log.Println("engine.io read:", err.Error())
 				return
 			}
 			if err = c.handle(ß, p); err != nil {
-				log.Println("handle:", err.Error())
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				log.Println("engine.io handle:", err.Error())
 			}
 		}
 	}()
@@ -103,7 +118,7 @@ func (c *Client) handle(ß *Socket, p *Packet) (err error) {
 // Close closes underlying connection and signals stop for background workers
 func (c *Client) Close() (err error) {
 	c.once.Do(func() {
-		close(c.closeChan)
+		c.cancel()
 		err = c.Conn.Close()
 	})
 	return

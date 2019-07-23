@@ -1,6 +1,7 @@
 package socketio
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/zyxar/socketio/engine"
@@ -20,8 +21,8 @@ func NewClient() (c *Client) {
 }
 
 // Dial connects to a socket.io server represented by `rawurl` and create Client instance on success.
-func (c *Client) Dial(rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (err error) {
-	e, err := engine.Dial(rawurl, requestHeader, dialer)
+func (c *Client) Dial(ctx context.Context, rawurl string, requestHeader http.Header, dialer engine.Dialer, parser Parser) (err error) {
+	e, err := engine.Dial(ctx, rawurl, requestHeader, dialer)
 	if err != nil {
 		return
 	}

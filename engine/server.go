@@ -1,9 +1,9 @@
 package engine
 
 import (
+	"context"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -12,20 +12,21 @@ type Server struct {
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	ßchan        chan *Socket
-	done         chan struct{}
-	once         sync.Once
+	ctx          context.Context
+	cancel       context.CancelFunc
 	*sessionManager
 	*eventHandlers
 }
 
 // NewServer creates a enine.io server instance
-func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, error) {
-	done := make(chan struct{})
+func NewServer(ctx context.Context, interval, timeout time.Duration, onOpen func(*Socket)) (*Server, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	s := &Server{
 		pingInterval:   interval,
 		pingTimeout:    timeout,
 		ßchan:          make(chan *Socket, 1),
-		done:           done,
+		ctx:            ctx,
+		cancel:         cancel,
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
 	}
@@ -33,7 +34,7 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 	go func() {
 		for {
 			select {
-			case <-done:
+			case <-ctx.Done():
 				return
 			case ß, ok := <-s.ßchan:
 				if !ok {
@@ -56,12 +57,22 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 								ß.CheckPaused()
 								continue
 							}
-							log.Println("handle:", err.Error())
+							select {
+							case <-ctx.Done():
+								return
+							default:
+							}
+							log.Println("engine.io handle:", err.Error())
 							s.fire(ß, EventClose, MessageTypeString, nil)
 							return
 						}
 						if err = s.handle(ß, p); err != nil {
-							log.Println("handle:", err.Error())
+							select {
+							case <-ctx.Done():
+								return
+							default:
+							}
+							log.Println("engine.io handle:", err.Error())
 						}
 					}
 				}()
@@ -96,9 +107,7 @@ func (s *Server) handle(ß *Socket, p *Packet) (err error) {
 
 // Close signals stop to background workers and closes server
 func (s *Server) Close() (err error) {
-	s.once.Do(func() {
-		close(s.done)
-	})
+	s.cancel()
 	return
 }
 
@@ -122,10 +131,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		ß := s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
+		ß := s.NewSession(s.ctx, conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
 		ß.transportName = transport.Name()
 		select {
-		case <-s.done:
+		case <-s.ctx.Done():
 			return
 		case s.ßchan <- ß:
 		}

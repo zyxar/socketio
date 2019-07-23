@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base32"
 	"io"
@@ -8,9 +9,9 @@ import (
 	"time"
 )
 
-func newSession(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
+func newSession(ctx context.Context, conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
 	id := generateSidBytes(16)
-	return newSocket(conn, readTimeout, writeTimeout, b32enc.EncodeToString(id))
+	return newSocket(ctx, conn, readTimeout, writeTimeout, b32enc.EncodeToString(id))
 }
 
 type sessionManager struct {
@@ -37,8 +38,8 @@ func (s *sessionManager) Remove(id string) {
 	s.Unlock()
 }
 
-func (s *sessionManager) NewSession(conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
-	ß := newSession(conn, readTimeout, writeTimeout)
+func (s *sessionManager) NewSession(ctx context.Context, conn Conn, readTimeout, writeTimeout time.Duration) *Socket {
+	ß := newSession(ctx, conn, readTimeout, writeTimeout)
 	s.Lock()
 	s.ß[ß.id] = ß
 	s.Unlock()
