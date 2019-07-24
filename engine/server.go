@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Server struct {
 	ßchan        chan *Socket
 	ctx          context.Context
 	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 	*sessionManager
 	*eventHandlers
 }
@@ -31,7 +33,9 @@ func NewServer(ctx context.Context, interval, timeout time.Duration, onOpen func
 		eventHandlers:  newEventHandlers(),
 	}
 
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
@@ -46,7 +50,9 @@ func NewServer(ctx context.Context, interval, timeout time.Duration, onOpen func
 					PingInterval: int(interval / time.Millisecond),
 					PingTimeout:  int(timeout / time.Millisecond),
 				})
+				s.wg.Add(1)
 				go func() {
+					defer s.wg.Done()
 					defer ß.Close()
 					defer s.sessionManager.Remove(ß.id)
 					var p *Packet
@@ -62,7 +68,7 @@ func NewServer(ctx context.Context, interval, timeout time.Duration, onOpen func
 								return
 							default:
 							}
-							log.Println("engine.io handle:", err.Error())
+							log.Println("engine.io read:", err.Error())
 							s.fire(ß, EventClose, MessageTypeString, nil)
 							return
 						}
@@ -108,6 +114,7 @@ func (s *Server) handle(ß *Socket, p *Packet) (err error) {
 // Close signals stop to background workers and closes server
 func (s *Server) Close() (err error) {
 	s.cancel()
+	s.wg.Wait()
 	return
 }
 

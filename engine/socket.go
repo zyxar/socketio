@@ -21,6 +21,7 @@ type Socket struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
+	closeOnce     sync.Once
 	sync.RWMutex
 }
 
@@ -83,8 +84,14 @@ func (s *Socket) ContextErr() error {
 
 // Close closes underlying connection and waits til corresponding routines exit
 func (s *Socket) Close() (err error) {
-	s.cancel()
-	s.wg.Wait()
+	s.closeOnce.Do(func() {
+		s.cancel()
+		s.RLock()
+		conn := s.Conn
+		s.RUnlock()
+		err = conn.Close()
+		s.wg.Wait()
+	})
 	return
 }
 
@@ -135,7 +142,10 @@ func (s *Socket) Send(args interface{}) (err error) {
 
 // ServeHTTP implements http.Handler
 func (s *Socket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, ok := s.Conn.(http.Handler); ok {
+	s.RLock()
+	conn := s.Conn
+	s.RUnlock()
+	if handler, ok := conn.(http.Handler); ok {
 		handler.ServeHTTP(w, r)
 	}
 }
@@ -160,9 +170,10 @@ func (s *Socket) submit(p *Packet) error {
 func (s *Socket) emit(p *Packet) {
 	s.CheckPaused()
 	s.RLock()
-	s.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-	s.WritePacket(p)
+	conn := s.Conn
 	s.RUnlock()
+	conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+	conn.WritePacket(p)
 }
 
 func (s *Socket) loop() {

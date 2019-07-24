@@ -13,8 +13,8 @@ import (
 type Client struct {
 	*Socket
 	*eventHandlers
-	once   sync.Once
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // Dial connects to a engine.io server represented by `rawurl` and create Client instance on success.
@@ -46,25 +46,30 @@ func Dial(ctx context.Context, rawurl string, requestHeader http.Header, dialer 
 		cancel:        cancel,
 	}
 
+	c.wg.Add(1)
 	go func() {
-		var err error
+		defer c.wg.Done()
+		tick := time.NewTicker(pingInterval)
+		defer tick.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(pingInterval):
+			case <-tick.C:
 			}
 			if err = ß.Emit(EventPing, MessageTypeString, nil); err != nil {
 				select {
 				case <-ctx.Done():
 				default:
-					log.Println("engine.io emit:", err.Error())
+					log.Println("engine.io ping:", err.Error())
 				}
 				return
 			}
 		}
 	}()
+	c.wg.Add(1)
 	go func() {
+		defer c.wg.Done()
 		defer ß.Close()
 		var p *Packet
 		var err error
@@ -83,7 +88,7 @@ func Dial(ctx context.Context, rawurl string, requestHeader http.Header, dialer 
 				log.Println("engine.io read:", err.Error())
 				return
 			}
-			if err = c.handle(ß, p); err != nil {
+			if err = c.handle(p); err != nil {
 				select {
 				case <-ctx.Done():
 					return
@@ -97,16 +102,16 @@ func Dial(ctx context.Context, rawurl string, requestHeader http.Header, dialer 
 	return
 }
 
-func (c *Client) handle(ß *Socket, p *Packet) (err error) {
+func (c *Client) handle(p *Packet) (err error) {
 	switch p.pktType {
 	case PacketTypeOpen:
 	case PacketTypeClose:
-		c.fire(ß, EventClose, p.msgType, p.data)
-		return ß.Close()
+		c.fire(c.Socket, EventClose, p.msgType, p.data)
+		return c.Socket.Close()
 	case PacketTypePing:
 	case PacketTypePong:
 	case PacketTypeMessage:
-		c.fire(ß, EventMessage, p.msgType, p.data)
+		c.fire(c.Socket, EventMessage, p.msgType, p.data)
 	case PacketTypeUpgrade:
 	case PacketTypeNoop:
 	default:
@@ -117,9 +122,8 @@ func (c *Client) handle(ß *Socket, p *Packet) (err error) {
 
 // Close closes underlying connection and signals stop for background workers
 func (c *Client) Close() (err error) {
-	c.once.Do(func() {
-		c.cancel()
-		err = c.Conn.Close()
-	})
+	c.cancel()
+	err = c.Socket.Close()
+	c.wg.Wait()
 	return
 }
