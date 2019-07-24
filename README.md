@@ -11,7 +11,8 @@
 ## Install
 
 ```shell
-go get -v -u github.com/zyxar/socketio
+#enable GO111MODULE if not
+go get -v -u github.com/zyxar/socketio/v2
 ```
 
 ## Features
@@ -37,7 +38,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zyxar/socketio"
+	"github.com/zyxar/socketio/v2"
 )
 
 func main() {
@@ -258,4 +259,43 @@ server {
     }
 }
 
+```
+
+## get RemoteAddr of Client while behind nginx
+
+```
+server {
+
+    # ...
+
+    set_real_ip_from  192.168.1.0/24; # trust if from another proxy
+    set_real_ip_from  192.168.2.1;
+    set_real_ip_from  2001:0db8::/32;
+    real_ip_header    X-Remote-Addr;
+    real_ip_recursive on;
+
+    location /socket.io/ {
+        # ...
+        proxy_pass http://socketio;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Remote-Addr "$remote_addr:$remote_port";
+    }
+}
+```
+
+```go
+// SocketioWrap overrides RemoteAddr
+type SocketioWrap struct {
+    socketio.Socket
+}
+
+func (s *SocketioWrap) RemoteAddr() net.Addr {
+    if remoteAddr := s.Socket.GetHeader(`X-Remote-Addr`); remoteAddr != "" {
+        if addr, err := net.ResolveTCPAddr("tcp", remoteAddr); err == nil {
+            return addr
+        }
+    }
+    return s.Socket.RemoteAddr()
+}
 ```
