@@ -1,4 +1,4 @@
-module github.com/zyxar/socketio
+module github.com/zyxar/socketio/v2
 
 require (
 	github.com/gorilla/websocket v1.4.1

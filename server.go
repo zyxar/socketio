@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zyxar/socketio/engine"
+	"github.com/zyxar/socketio/v2/engine"
 )
 
 // Server is socket.io server implementation

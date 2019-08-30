@@ -8,7 +8,7 @@
 ## Install
 
 ```shell
-vgo get -v github.com/zyxar/socketio/engine
+vgo get -v github.com/zyxar/socketio/v2/engine
 ```
 
 ## Example
@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/zyxar/socketio/engine"
+	"github.com/zyxar/socketio/v2/engine"
 )
 
 func main() {
