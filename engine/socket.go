@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -15,7 +14,7 @@ type Socket struct {
 	writeTimeout  time.Duration
 	transportName string
 	id            string
-	barrier       atomic.Value
+	barrier       Barrier
 	emitter       *emitter
 	once          sync.Once
 	sync.RWMutex
@@ -26,26 +25,10 @@ func newSocket(conn Conn, readTimeout, writeTimeout time.Duration, id string) *S
 		Conn:         conn,
 		readTimeout:  readTimeout,
 		writeTimeout: writeTimeout,
-		id:           id}
+		id:           id,
+		barrier:      newWaitGroupBarrier()}
 	so.emitter = newEmitter(so, 8)
-	pauseChan := make(chan struct{})
-	close(pauseChan)
-	so.barrier.Store(pauseChan)
 	return so
-}
-
-// CheckPaused blocks when socket is paused
-func (s *Socket) CheckPaused() {
-	<-s.barrier.Load().(chan struct{})
-}
-
-func (s *Socket) pause() {
-	pauseChan := make(chan struct{})
-	s.barrier.Store(pauseChan)
-}
-
-func (s *Socket) resume() {
-	close(s.barrier.Load().(chan struct{}))
 }
 
 // Read returns a Packet upon success or error on failure

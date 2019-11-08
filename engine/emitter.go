@@ -59,7 +59,7 @@ func (e *emitter) loop() {
 		case <-e.done:
 			return
 		case p := <-e.packets:
-			e.so.CheckPaused()
+			e.so.barrier.Wait()
 			e.so.RLock()
 			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
 			e.so.WritePacket(p)
@@ -72,7 +72,7 @@ func (e *emitter) flush() {
 	for {
 		select {
 		case p := <-e.packets:
-			e.so.CheckPaused()
+			e.so.barrier.Wait()
 			e.so.RLock()
 			e.so.SetWriteDeadline(time.Now().Add(e.so.writeTimeout))
 			e.so.WritePacket(p)

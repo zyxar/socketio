@@ -53,7 +53,7 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 					for {
 						if p, err = ß.Read(); err != nil {
 							if err == ErrPollingConnPaused {
-								ß.CheckPaused()
+								ß.barrier.Wait()
 								continue
 							}
 							log.Println("handle:", err.Error())
@@ -149,8 +149,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) upgrade(ß *Socket, transportName string, newConn Conn) {
-	ß.pause()
-	defer ß.resume()
+	defer ß.barrier.Pause().Resume()
+
 	newConn.SetReadDeadline(time.Now().Add(ß.readTimeout))
 	p, err := newConn.ReadPacket()
 	if err != nil {
