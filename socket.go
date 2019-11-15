@@ -25,6 +25,10 @@ type Socket interface {
 	GetHeader(key string) string
 	Sid() string
 	io.Closer
+
+	Join(room string)
+	Leave(room string)
+	BroadcastToRoom(room string, event string, args ...interface{})
 }
 
 type nspSock struct {
@@ -46,11 +50,39 @@ func (n *nspSock) EmitError(arg interface{}) (err error) {
 }
 
 type socket struct {
-	ß       *engine.Socket
-	encoder Encoder
-	decoder Decoder
-	acks    map[string]*ackHandle
-	mutex   sync.RWMutex
+	ß         *engine.Socket
+	encoder   Encoder
+	decoder   Decoder
+	acks      map[string]*ackHandle
+	mutex     sync.RWMutex
+	server    *Server
+	namespace string
+}
+
+func (s *socket) Join(room string) {
+	server := s.server
+	server.sockLock.Lock()
+	if server.rooms == nil {
+		server.rooms = map[string]map[string]*socket{}
+	}
+	if server.rooms[room] == nil {
+		server.rooms[room] = map[string]*socket{}
+	}
+	server.rooms[room][s.Sid()] = s
+	server.sockLock.Unlock()
+}
+
+func (s *socket) Leave(room string) {
+	server := s.server
+	server.sockLock.Lock()
+	if server.rooms[room] != nil {
+		delete(server.rooms[room], s.Sid())
+	}
+	server.sockLock.Unlock()
+}
+
+func (s *socket) BroadcastToRoom(room string, event string, args ...interface{}) {
+	s.server.BroadcastToRoom(room, event, args)
 }
 
 func newSocket(ß *engine.Socket, parser Parser) *socket {
@@ -106,14 +138,14 @@ func (s *socket) fireAck(nsp string, id uint64, data []byte, buffer [][]byte, au
 
 // Emit implements Socket.Emit
 func (s *socket) Emit(event string, args ...interface{}) (err error) {
-	return s.emit("/", event, args...)
+	return s.emit(s.namespace, event, args...)
 }
 
 // EmitError implements Socket.EmitError
 func (s *socket) EmitError(arg interface{}) (err error) { return s.emitError("/", arg) }
 
 // Namespace implements Socket.Namespace
-func (*socket) Namespace() string { return "/" }
+func (s *socket) Namespace() string { return s.namespace }
 
 func (s *socket) emit(nsp string, event string, args ...interface{}) (err error) {
 	s.mutex.RLock()
