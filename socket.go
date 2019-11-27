@@ -28,6 +28,7 @@ type Socket interface {
 
 	Join(room string)
 	Leave(room string)
+	LeaveAll()
 	BroadcastToRoom(room string, event string, args ...interface{})
 }
 
@@ -81,8 +82,17 @@ func (s *socket) Leave(room string) {
 	server.sockLock.Unlock()
 }
 
+func (s *socket) LeaveAll() {
+	server := s.server
+	server.sockLock.Lock()
+	for _, room := range server.rooms {
+		delete(room, s.Sid())
+	}
+	server.sockLock.Unlock()
+}
+
 func (s *socket) BroadcastToRoom(room string, event string, args ...interface{}) {
-	s.server.BroadcastToRoom(room, event, args)
+	s.server.BroadcastToRoom(room, event, args...)
 }
 
 func newSocket(ß *engine.Socket, parser Parser) *socket {

@@ -1,11 +1,11 @@
 package socketio
 
 import (
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/zyxar/socketio/engine"
 )
 
@@ -194,10 +194,17 @@ func (s *Server) process(sock *socket, p *Packet) {
 }
 
 func (s *Server) BroadcastToRoom(room string, event string, args ...interface{}) {
-	for sid := range s.rooms[room] {
-		so := s.rooms[room][sid]
-		if err := so.Emit(event, args); err != nil {
-			log.Println("[BroadcastToRoom]", room, event, args, err)
+	for sid, so := range s.rooms[room] {
+		if sid == "" || so == nil {
+			continue
+		}
+
+		if err := so.Emit(event, args...); err != nil {
+			logrus.Error("[BroadcastToRoom] sid="+sid+", ", err, " ,args=", args)
+			if err == ErrorNamespaceUnavaialble {
+				so.LeaveAll()
+				so.Close()
+			}
 		}
 	}
 }
