@@ -18,7 +18,7 @@ type Server struct {
 }
 
 // NewServer creates a socket.io server instance upon underlying engine.io transport
-func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, err error) {
+func NewServer(interval, timeout time.Duration, parser Parser, oc ...engine.OriginChecker) (server *Server, err error) {
 	e, err := engine.NewServer(interval, timeout, func(ß *engine.Socket) {
 		socket := newSocket(ß, parser)
 		socket.attachnsp("/")
@@ -37,7 +37,7 @@ func NewServer(interval, timeout time.Duration, parser Parser) (server *Server, 
 		if nsp.onConnect != nil {
 			nsp.onConnect(socket)
 		}
-	})
+	}, oc...)
 	if err != nil {
 		return
 	}

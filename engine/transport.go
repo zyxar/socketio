@@ -28,6 +28,10 @@ type Acceptor interface {
 	Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error)
 }
 
+type OriginChecker interface {
+	CheckOrigin(*http.Request) bool
+}
+
 // Conn is abstraction of bidirectional engine.io connection
 type Conn interface {
 	PacketReader
@@ -45,16 +49,6 @@ type Conn interface {
 	// private
 	httpHeader() http.Header
 	copyHeaderFrom(conn Conn)
-}
-
-func getTransport(name string) Transport {
-	switch name {
-	case transportWebsocket:
-		return WebsocketTransport
-	case transportPolling:
-		return PollingTransport
-	}
-	return nil
 }
 
 // PacketReader reads data from remote and outputs a Packet when appropriate
@@ -75,6 +69,8 @@ const (
 var (
 	// ErrPauseNotSupported indicates that a connection does not support PAUSE (e.g. websocket)
 	ErrPauseNotSupported = errors.New("transport pause unsupported")
+	// ErrPollingOriginNotAllowed indicates that the connection is refused due to CheckOrigin failure
+	ErrPollingOriginNotAllowed = errors.New("polling: request origin not allowed")
 )
 
 // WebsocketTransport is a Transport instance for websocket
@@ -139,9 +135,15 @@ func cloneHTTPHeader(h http.Header) http.Header {
 	return h2
 }
 
-type pollingAcceptor struct{}
+type pollingAcceptor struct{ CheckOrigin func(*http.Request) bool }
 
-func (pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
+func (p pollingAcceptor) Accept(w http.ResponseWriter, r *http.Request) (conn Conn, err error) {
+	if p.CheckOrigin != nil {
+		if !p.CheckOrigin(r) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return nil, ErrPollingOriginNotAllowed
+		}
+	}
 	return newPollingConn(8, r.Host, r.RemoteAddr, r.Header), nil
 }
 

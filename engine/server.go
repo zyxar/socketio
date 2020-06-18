@@ -9,17 +9,19 @@ import (
 
 // Server is engine.io server implementation
 type Server struct {
-	pingInterval time.Duration
-	pingTimeout  time.Duration
-	ßchan        chan *Socket
-	done         chan struct{}
-	once         sync.Once
+	pingInterval       time.Duration
+	pingTimeout        time.Duration
+	ßchan              chan *Socket
+	done               chan struct{}
+	once               sync.Once
+	websocketTransport websocketTransport
+	pollingTransport   pollingTransport
 	*sessionManager
 	*eventHandlers
 }
 
 // NewServer creates a enine.io server instance
-func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, error) {
+func NewServer(interval, timeout time.Duration, onOpen func(*Socket), oc ...OriginChecker) (*Server, error) {
 	done := make(chan struct{})
 	s := &Server{
 		pingInterval:   interval,
@@ -29,7 +31,16 @@ func NewServer(interval, timeout time.Duration, onOpen func(*Socket)) (*Server, 
 		sessionManager: newSessionManager(),
 		eventHandlers:  newEventHandlers(),
 	}
-
+	var checkOrigin = func(r *http.Request) bool {
+		for _, c := range oc {
+			if c != nil && !c.CheckOrigin(r) {
+				return false
+			}
+		}
+		return true
+	}
+	s.websocketTransport.Upgrader.CheckOrigin = checkOrigin
+	s.pollingTransport.CheckOrigin = checkOrigin
 	go func() {
 		for {
 			select {
@@ -102,6 +113,16 @@ func (s *Server) Close() (err error) {
 	return
 }
 
+func (s *Server) getTransport(name string) Transport {
+	switch name {
+	case transportWebsocket:
+		return &s.websocketTransport
+	case transportPolling:
+		return &s.pollingTransport
+	}
+	return nil
+}
+
 // ServeHTTP impements http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -110,7 +131,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transport := getTransport(query.Get(queryTransport))
+	transport := s.getTransport(query.Get(queryTransport))
 	if transport == nil {
 		http.Error(w, "invalid transport", http.StatusBadRequest)
 		return
@@ -119,7 +140,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if sid := query.Get(querySession); sid == "" {
 		conn, err := transport.Accept(w, r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		ß := s.NewSession(conn, s.pingTimeout+s.pingInterval, s.pingTimeout)
@@ -139,7 +159,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if transportName := transport.Name(); ß.transportName != transportName {
 			conn, err := transport.Accept(w, r)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			s.upgrade(ß, transportName, conn)

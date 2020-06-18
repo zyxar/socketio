@@ -25,3 +25,4 @@ ffjson*/
 
 npm-debug.log
 node_modules/*
+bin/
