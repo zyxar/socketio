@@ -102,3 +102,18 @@ func (s *Socket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Socket) Sid() string {
 	return s.id
 }
+
+// GetHeader returns the value in http header from client request specified by `key`
+func (s *Socket) GetHeader(key string) (val string) {
+	s.RLock()
+	val = s.Conn.httpHeader().Get(key)
+	s.RUnlock()
+	return
+}
+
+// SetHeader sets (key,value) in http header
+func (s *Socket) SetHeader(key, value string) {
+	s.Lock()
+	s.Conn.httpHeader().Set(key, value)
+	s.Unlock()
+}

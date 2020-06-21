@@ -23,6 +23,7 @@ type Socket interface {
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
 	GetHeader(key string) string
+	SetHeader(key, value string)
 	Sid() string
 	io.Closer
 }
@@ -179,3 +180,4 @@ func (s *socket) Close() (err error)          { return s.ß.Close() }
 func (s *socket) LocalAddr() net.Addr         { return s.ß.LocalAddr() }
 func (s *socket) RemoteAddr() net.Addr        { return s.ß.RemoteAddr() }
 func (s *socket) GetHeader(key string) string { return s.ß.GetHeader(key) }
+func (s *socket) SetHeader(key, value string) { s.ß.SetHeader(key, value) }

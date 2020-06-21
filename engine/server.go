@@ -201,11 +201,11 @@ func (s *Server) upgrade(ß *Socket, transportName string, newConn Conn) {
 	ß.Lock()
 	ß.Conn = newConn
 	ß.transportName = transportName
+	ß.Conn.copyHeaderFrom(conn)
 	ß.Unlock()
 
 	for _, packet := range conn.FlushIn() {
 		s.handle(ß, packet)
 	}
-
 	s.fire(ß, EventUpgrade, p.msgType, p.data)
 }

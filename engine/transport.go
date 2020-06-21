@@ -41,7 +41,10 @@ type Conn interface {
 	Resume() error
 	LocalAddr() net.Addr
 	RemoteAddr() net.Addr
-	GetHeader(key string) string
+
+	// private
+	httpHeader() http.Header
+	copyHeaderFrom(conn Conn)
 }
 
 func getTransport(name string) Transport {
@@ -114,6 +117,16 @@ func (t *websocketTransport) Dial(rawurl string, requestHeader http.Header) (Con
 		return nil, err
 	}
 	return &websocketConn{conn: c, header: cloneHTTPHeader(requestHeader)}, nil
+}
+
+func copyHeaderFrom(header http.Header, conn Conn) {
+	for k, vv := range conn.httpHeader() {
+		if _, ok := header[k]; !ok {
+			vv2 := make([]string, len(vv))
+			copy(vv2, vv)
+			header[k] = vv2
+		}
+	}
 }
 
 func cloneHTTPHeader(h http.Header) http.Header {

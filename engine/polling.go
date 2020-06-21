@@ -70,8 +70,8 @@ func (p *pollingConn) LocalAddr() net.Addr { return p.localAddr }
 // RemoteAddr returns the remote network address.
 func (p *pollingConn) RemoteAddr() net.Addr { return p.remoteAddr }
 
-// GetHeader returns the value in http header from client request specified by `key`
-func (p *pollingConn) GetHeader(key string) string { return p.header.Get(key) }
+func (p *pollingConn) httpHeader() http.Header  { return p.header }
+func (p *pollingConn) copyHeaderFrom(conn Conn) { copyHeaderFrom(p.header, conn) }
 
 func (p *pollingConn) ReadPacket() (*Packet, error) {
 	if p.isClosed() {
