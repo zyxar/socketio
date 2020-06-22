@@ -149,7 +149,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) upgrade(ß *Socket, transportName string, newConn Conn) {
-	defer ß.barrier.Pause().Resume()
+	ß.barrier.Pause()
+	defer ß.barrier.Resume()
 
 	newConn.SetReadDeadline(time.Now().Add(ß.readTimeout))
 	p, err := newConn.ReadPacket()

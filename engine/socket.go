@@ -26,7 +26,7 @@ func newSocket(conn Conn, readTimeout, writeTimeout time.Duration, id string) *S
 		readTimeout:  readTimeout,
 		writeTimeout: writeTimeout,
 		id:           id,
-		barrier:      newWaitGroupBarrier()}
+		barrier:      newLockBarrier()}
 	so.emitter = newEmitter(so, 8)
 	return so
 }
