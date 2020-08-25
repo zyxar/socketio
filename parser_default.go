@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -239,6 +240,12 @@ func (defaultDecoder) decode(s []byte) (p *Packet, err error) {
 			}
 		}
 		p.Namespace = string(s[i:j])
+		u, err := url.Parse(p.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse namespace from %q", p.Namespace)
+		}
+		p.Namespace = u.Path
+
 		i = j + 1
 		if i >= len(s) {
 			return p, nil
